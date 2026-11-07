@@ -1,7 +1,7 @@
 # TamaCookie — guide pour Claude
 
 Lapin façon tamagotchi qui vit en **overlay** (WindowManager) par-dessus l'écran Android.
-Kotlin 2.0, Android 13+ (minSdk 33, compile/target 34), deux modules — `:core` (Kotlin/JVM pur) et `:app`
+Kotlin 2.0, Android 16+ (minSdk 36, compile/target 36 — avant : 33 / 34), deux modules — `:core` (Kotlin/JVM pur) et `:app`
 (Android, dépend de `:core`) —, aucune dépendance runtime.
 Code, commentaires, commits et UI sont **en français**.
 
@@ -481,7 +481,7 @@ Principes :
     le hub, qui reste à **un seul écrivain** sans verrou (d'où un `ScanResult` plutôt qu'un `ScreenSnapshot`
     fabriqué sur le fil du scan). Un scan à la fois (une demande pendant un scan est rejouée au retour).
     `onDestroy` : `quit()` du fil, résultats en vol ignorés. `onInterrupt` reste vide (il ne signale qu'une
-    interruption du retour à l'utilisateur, le service reste connecté). minSdk 33 : `recycle()` est sans effet,
+    interruption du retour à l'utilisateur, le service reste connecté). minSdk 33 (36 aujourd'hui) : `recycle()` est sans effet,
     rien à recycler. Une exception de lecture est journalisée (avant : plantage du processus).
   - **`TamaApp` + `AppGraph`** (`TamaApp.kt`, déclarée dans le manifeste) : `screen` (hub unique) et
     `foregroundWatcher()` (un par `BunnyService`). Le service d'accessibilité publie par `AppGraph.of(this).screen`,

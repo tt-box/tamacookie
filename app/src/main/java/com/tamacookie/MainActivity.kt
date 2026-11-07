@@ -298,6 +298,7 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
 
         scroll.filterTouchesWhenObscured = true
         setContentView(scroll)
+        EdgeToEdge.apply(window, scroll, root)
 
         // Premier lancement : écran d'adoption
         if (Pets.repository(this).loadResident()?.adopted != true) {
