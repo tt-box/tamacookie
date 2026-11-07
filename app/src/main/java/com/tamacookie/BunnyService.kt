@@ -10,7 +10,6 @@ import android.content.SharedPreferences
 import android.content.pm.ServiceInfo
 import android.content.res.Configuration
 import android.database.ContentObserver
-import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -464,8 +463,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     /** Passe au premier plan ; false si le système le refuse (ex. redémarrage en arrière-plan sur Android 15+). */
     private fun tryStartForeground(): Boolean = try {
         val n = notifier.build()
-        if (Build.VERSION.SDK_INT >= 34) startForeground(PetNotifier.NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-        else startForeground(PetNotifier.NOTIF_ID, n)
+        startForeground(PetNotifier.NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         true
     } catch (e: Exception) {
         // ForegroundServiceStartNotAllowedException (API 31+) ou autre refus

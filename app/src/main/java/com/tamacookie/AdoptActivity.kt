@@ -193,6 +193,7 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
 
         scroll.filterTouchesWhenObscured = true
         setContentView(scroll)
+        EdgeToEdge.apply(window, scroll, root)
         refreshAll()
     }
 

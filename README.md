@@ -6,7 +6,7 @@
 [![Dernière version](https://img.shields.io/github/v/release/tt-box/tamacookie?label=version&logo=github)](https://github.com/tt-box/tamacookie/releases/latest)
 [![Téléchargements](https://img.shields.io/github/downloads/tt-box/tamacookie/total?label=t%C3%A9l%C3%A9chargements&logo=android&color=3DDC84)](https://github.com/tt-box/tamacookie/releases)
 [![Téléchargements (dernière version)](https://img.shields.io/github/downloads/tt-box/tamacookie/latest/total?label=derni%C3%A8re%20version)](https://github.com/tt-box/tamacookie/releases/latest)
-[![Android 13+](https://img.shields.io/badge/Android-13%2B-3DDC84?logo=android&logoColor=white)](https://developer.android.com/about/versions/13)
+[![Android 16+](https://img.shields.io/badge/Android-16%2B-3DDC84?logo=android&logoColor=white)](https://developer.android.com/about/versions/16)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Dependabot](https://img.shields.io/badge/Dependabot-auto--merge-025E8C?logo=dependabot)](.github/dependabot.yml)
 [![Licence LGPL-3.0](https://img.shields.io/github/license/tt-box/tamacookie?label=licence&color=blue)](LICENSE)
@@ -55,7 +55,7 @@ Chaque release fournit aussi :
 | Permission | Obligatoire ? | Pourquoi | Où l'accorder |
 |---|---|---|---|
 | Affichage par-dessus les autres apps | **Oui** | Faire vivre le lapin à l'écran (fenêtres flottantes) | Écran principal › « Faire apparaître Cookie », voir [ci-dessous](#1-affichage-par-dessus-les-autres-apps-obligatoire) |
-| Notifications | **Oui** (Android 13+) | Le service tourne au premier plan, avec sa notification (Nourrir, Cacher…) et les alertes (faim, maladie…) | Demandée au premier lancement |
+| Notifications | **Oui** | Le service tourne au premier plan, avec sa notification (Nourrir, Cacher…) et les alertes (faim, maladie…) | Demandée au premier lancement |
 | Accès aux données d'utilisation | Non | Savoir quelle application est ouverte (sans accessibilité) pour qu'il la commente et la suive | Écran principal › ligne ⚠️, ou Paramètres › Applis › Accès spécial des applis › Accès aux données d'utilisation |
 | Accessibilité | Non | Position des icônes, page du bureau, défilement : il saute sur les icônes et suit les pages. **Jamais** le texte saisi ni le contenu des écrans. Une seule action : appuyer sur le bouton « Ignorer / Passer l'annonce » d'une publicité (chasseur de pubs, désactivable) | Paramètres › Accessibilité › TamaCookie |
 
@@ -87,9 +87,8 @@ Un APK installé **hors du Play Store** (fichier téléchargé, comme les releas
 *paramètres restreints* d'Android : l'interrupteur est grisé, ou il refuse sans explication (« Paramètre
 restreint » / « Pour votre sécurité, ce paramètre n'est pas disponible »).
 
-- Android 13 et 14 : seul le **service d'accessibilité** est concerné.
-- Android 15 et plus récent (vu sur Pixel 7 Pro, Android 17) : l'**affichage par-dessus les autres apps** l'est
-  aussi — c'est le cas le plus fréquent de « je n'arrive pas à l'activer ».
+Sont concernés le **service d'accessibilité** et, au moins sur certains appareils (vu sur Pixel 7 Pro, Android 17),
+l'**affichage par-dessus les autres apps** — c'est le cas le plus fréquent de « je n'arrive pas à l'activer ».
 
 Pour lever la restriction (une fois suffit, pour toutes les autorisations de l'app) :
 
@@ -126,7 +125,7 @@ L'accessibilité ne s'active pas proprement par ADB sans écraser les autres ser
 
 ## 🛠️ Développement
 
-Prérequis : JDK 21 (Gradle s'y lance d'office, voir `gradle/gradle-daemon-jvm.properties`) et le SDK Android (API 34).
+Prérequis : JDK 21 (Gradle s'y lance d'office, voir `gradle/gradle-daemon-jvm.properties`) et le SDK Android (API 36). L'app demande **Android 16 ou plus récent** (`minSdk` 36).
 
 ```bash
 ./gradlew :core:test testDebugUnitTest   # tests unitaires (JVM) : cœur puis app

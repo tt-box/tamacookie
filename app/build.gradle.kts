@@ -32,12 +32,12 @@ val hasReleaseKey =
 
 android {
     namespace = "com.tamacookie"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.tamacookie"
-        minSdk = 33          // Android 13
-        targetSdk = 34
+        minSdk = 36          // Android 16
+        targetSdk = 36
         versionCode = appVersionCode
         versionName = appVersionName
     }
@@ -49,7 +49,7 @@ android {
                 storePassword = keystorePassword
                 keyAlias = releaseKeyAlias
                 keyPassword = releaseKeyPassword
-                // minSdk 33 : v1 (JAR) inutile ; v2 + v3/v3.1 (rotation de clé) + v4.
+                // minSdk 36 : v1 (JAR) inutile ; v2 + v3/v3.1 (rotation de clé) + v4.
                 enableV1Signing = false
                 enableV2Signing = true
                 enableV3Signing = true
