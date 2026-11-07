@@ -26,7 +26,8 @@ Chaque release fournit aussi :
 
 - `tamacookie-<version>-unsigned.apk` : le même APK **non signé**, à signer avec ta propre clé
   (il ne s'installe pas tel quel) ;
-- `tamacookie-<version>.aab` : l'Android App Bundle signé, format de publication du Play Store ;
+- `tamacookie-<version>.aab` : l'Android App Bundle, format de publication du Play Store, signé avec
+  la clé d'upload du Play Store (RSA, distincte de la clé des APK) ;
 - `SHA256SUMS.txt` : les empreintes de tous ces fichiers.
 
 ## ✨ Fonctionnalités
