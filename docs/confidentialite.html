@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TamaCookie — Règles de confidentialité</title>
+<meta name="description" content="Règles de confidentialité de l'application Android TamaCookie : aucune donnée collectée, rien n'est envoyé.">
+<style>
+  :root { --ink: #3A2E39; --muted: #6E5F69; --bg: #FFF8F3; --card: #FFFFFF; --accent: #C2456A; --line: #EADDE2; }
+  @media (prefers-color-scheme: dark) {
+    :root { --ink: #F3E9EE; --muted: #C9B8C2; --bg: #1E181D; --card: #2A2228; --accent: #F08AA6; --line: #3E3239; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 1.8rem; line-height: 1.25; margin: 0 0 4px; }
+  h2 { font-size: 1.2rem; margin: 2em 0 .5em; color: var(--accent); }
+  p, li { color: var(--ink); }
+  .meta { color: var(--muted); margin: 0 0 24px; }
+  .summary { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 20px; }
+  .summary strong { color: var(--accent); }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: .95rem; }
+  th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; }
+  a { color: var(--accent); }
+  .table-wrap { overflow-x: auto; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Règles de confidentialité de TamaCookie</h1>
+  <p class="meta">Application Android « TamaCookie » (identifiant <code>com.tamacookie</code>), éditée par FiveElements.<br>
+    Dernière mise à jour : 7 novembre 2026.</p>
+
+  <div class="summary">
+    <p><strong>En bref :</strong> TamaCookie ne collecte, ne transmet, ne vend et ne partage <strong>aucune donnée</strong>.
+      L'application n'a pas l'autorisation d'accéder à Internet : tout ce qu'elle utilise reste sur ton appareil.
+      Il n'y a ni compte, ni publicité, ni outil de mesure d'audience, ni service tiers.</p>
+  </div>
+
+  <h2>1. Qui sommes-nous</h2>
+  <p>TamaCookie est un petit lapin virtuel, façon tamagotchi, qui vit par-dessus l'écran de ton appareil Android.
+    L'application est un logiciel libre (licence LGPL-3.0-or-later) publié par FiveElements ; son code source est
+    consultable sur <a href="https://github.com/tt-box/tamacookie">github.com/tt-box/tamacookie</a>.</p>
+
+  <h2>2. Données collectées et partagées</h2>
+  <p><strong>Aucune.</strong> L'application ne déclare pas l'autorisation Android <code>INTERNET</code> : elle est
+    techniquement incapable d'envoyer quoi que ce soit hors de l'appareil. Aucune donnée n'est transmise au développeur
+    ni à un tiers, et aucune n'est vendue. Aucune bibliothèque de publicité, d'analyse, de rapport de plantage ou de
+    réseau social n'est intégrée.</p>
+
+  <h2>3. Données conservées sur l'appareil</h2>
+  <p>Pour que ton lapin se souvienne de toi, l'application enregistre localement, dans son espace privé (inaccessible
+    aux autres applications) :</p>
+  <ul>
+    <li>tes animaux : nom, apparence, caractère, jouet préféré, jauges (satiété, bonheur, énergie, propreté, santé),
+      date d'adoption, nombre d'applications visitées ;</li>
+    <li>tes réglages : niveau de bêtises, thèmes de saison, pauses proposées, chasseur de pubs, emplacement des objets
+      à l'écran.</li>
+  </ul>
+  <p>La sauvegarde automatique d'Android est désactivée pour cette application : ces données ne sont pas copiées vers
+    un compte en ligne. Elles sont effacées quand tu désinstalles l'application ou que tu vides ses données
+    (Paramètres › Applications › TamaCookie › Stockage).</p>
+
+  <h2>4. Autorisations et ce qu'elles permettent</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Autorisation</th><th>Pourquoi</th><th>Ce qui est fait des informations</th></tr></thead>
+    <tbody>
+      <tr><td>Affichage par-dessus les autres applications (obligatoire)</td>
+        <td>Afficher le lapin, ses objets et ses bulles au-dessus de l'écran.</td>
+        <td>Aucune information n'est lue par cette autorisation.</td></tr>
+      <tr><td>Notifications</td>
+        <td>Le service qui fait vivre le lapin tourne au premier plan, avec une notification (Nourrir, Cacher…), et
+          prévient quand il a faim ou est malade.</td>
+        <td>Aucune information n'est lue.</td></tr>
+      <tr><td>Accès aux données d'utilisation (facultatif)</td>
+        <td>Savoir quelle application est ouverte, pour que le lapin la commente et te suive d'une application à
+          l'autre.</td>
+        <td>Seul le nom de l'application au premier plan est utilisé, sur le moment ; seul un compteur du nombre
+          d'applications visitées est conservé. Rien n'est enregistré ni transmis.</td></tr>
+      <tr><td>Service d'accessibilité (facultatif)</td>
+        <td>Connaître la <em>position</em> des icônes et des boutons affichés pour que le lapin saute dessus, la page
+          du bureau et le défilement ; remarquer qu'un bouton est touché ou que tu tapes au clavier (pour ses
+          réactions) ; et, si le réglage « Chasseur de pubs » est actif, appuyer sur le bouton « Ignorer l'annonce » /
+          « Passer l'annonce » d'une publicité.</td>
+        <td>Sont lus : la position et le nom court des éléments (par exemple « Chrome »), et le numéro de page du
+          bureau. <strong>Jamais</strong> le texte que tu saisis, le contenu des champs, des messages ou des pages,
+          ni les mots de passe. Ces informations sont utilisées sur le moment, en mémoire, puis oubliées : elles ne
+          sont ni enregistrées ni transmises. La seule action possible est l'appui sur le bouton « Ignorer / Passer
+          l'annonce » (liste stricte de libellés), uniquement si tu laisses le réglage actif.</td></tr>
+      <tr><td>Démarrage au lancement de l'appareil</td>
+        <td>Relancer le lapin après un redémarrage ou une mise à jour, s'il était actif.</td>
+        <td>Aucune information n'est lue.</td></tr>
+      <tr><td>Vibreur, service au premier plan, masquage des fenêtres flottantes</td>
+        <td>Petites vibrations, maintien du lapin à l'écran, protection des écrans de réglage.</td>
+        <td>Aucune information n'est lue.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>Les autorisations facultatives peuvent être retirées à tout moment dans les Paramètres d'Android ; le lapin
+    continue alors de vivre avec moins de réactions.</p>
+
+  <h2>5. Enfants</h2>
+  <p>TamaCookie ne collecte aucune donnée, quel que soit l'âge de la personne qui l'utilise, et ne contient ni
+    publicité, ni achat intégré, ni échange avec d'autres personnes.</p>
+
+  <h2>6. Sécurité</h2>
+  <p>Les données restent dans l'espace privé de l'application, protégé par Android. Aucune donnée ne circulant sur un
+    réseau, aucune ne peut être interceptée en chemin.</p>
+
+  <h2>7. Tes droits</h2>
+  <p>Comme aucune donnée te concernant n'est collectée ni détenue par le développeur, il n'y a rien à consulter, à
+    corriger ou à supprimer de notre côté. Tu gardes la maîtrise complète des données locales : les modifier dans
+    l'application, ou les effacer en vidant ses données ou en la désinstallant.</p>
+
+  <h2>8. Modifications</h2>
+  <p>Si une fonction future devait changer la façon dont des données sont traitées (par exemple un échange d'animaux
+    entre deux appareils proches), ces règles seraient mises à jour avant sa publication, et la date en haut de cette
+    page modifiée.</p>
+
+  <h2>9. Contact</h2>
+  <p>Pour toute question sur ces règles : ouvre un ticket sur
+    <a href="https://github.com/tt-box/tamacookie/issues">github.com/tt-box/tamacookie/issues</a>.</p>
+</main>
+</body>
+</html>
