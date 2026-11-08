@@ -113,6 +113,8 @@ class Mind(val rnd: Random, species: Species = Species.DEFAULT) {
     var chatterIn = 25f
     /** Durée de la partie de jeu en cours (s). */
     var playTime = 0f
+    /** Jouet ([Prop.id]) dont il a fini sa partie : il n'y revient pas (les autres peuvent y jouer) ; -1 = aucun. */
+    var playedOut = -1
     /** Délai avant un nouveau coup de patte / de tête dans un jouet (s). */
     var kickCooldown = 0f
     var danceTime = 0f

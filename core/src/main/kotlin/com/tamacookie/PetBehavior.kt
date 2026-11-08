@@ -56,7 +56,7 @@ class PetBehavior(private val ctx: PetCtx, private val hooks: Hooks) {
             Act.IDLE -> {
                 b.pose = Pose.IDLE
                 b.fy = actor.surfaceY(p)
-                if (ctx.world.hasToy()) { p.setAct(Act.PLAY); return }
+                if (joinsPlay(p)) { p.setAct(Act.PLAY); return }
                 if (chasesFood(p)) return
                 m.chatterIn -= dt
                 if (m.chatterIn <= 0f) { m.chatterIn = 50f + rnd.nextFloat() * 80f; chatter(p) }
@@ -293,6 +293,17 @@ class PetBehavior(private val ctx: PetCtx, private val hooks: Hooks) {
      * Une nourriture est posée : il y court (au repos, en marchant ou assis). Elle n'est à personne : le plus proche
      * l'emporte (`Director.foodWinner`), et un perdant n'y retourne que s'il est devenu le plus proche.
      */
+    /**
+     * Un jouet est sorti et [p] peut se joindre à la partie : il n'en a pas fini avec ce jouet
+     * (`Mind.playedOut`) et n'est pas trop fatigué. Sa partie repart de zéro.
+     */
+    private fun joinsPlay(p: Pet): Boolean {
+        val toy = ctx.world.currentToy() ?: return false
+        if (p.mind.playedOut == toy.id || p.stats.energy < ctx.rules.playStopEnergyBelow) return false
+        p.mind.playTime = 0f
+        return true
+    }
+
     private fun chasesFood(p: Pet): Boolean {
         if (!ctx.world.hasFood() || ctx.director.foodTarget(p) == null) return false
         p.setAct(Act.GOTO_FOOD)
