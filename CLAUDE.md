@@ -629,10 +629,12 @@ Principes :
       — il s'assoit 3 s et ressort) ; endormi, **`PetEvent.Rested(hours)`** chaque image (énergie
       `bedEnergyGainPerH` = 25/h **en plus** du temps qui passe ; sans effet éveillé ; pas de sauvegarde immédiate).
       Une caresse le réveille **sans** mauvaise humeur (`Woken(grumpy = false)`), il sort 3 s après ; le sortir
-      (glisser, changement de vue) le réveille. Deux places : `StationBehavior.seatFor(rang)` (rang d'arrivée dans
+      (glisser) le réveille. **Depuis, le lit est `holdsPet`** (comme la cage) : changer de page du bureau ou d'app
+      ne le fait plus sortir — il disparaît avec le lit et revient avec lui, toujours endormi ; on ne déplace pas
+      le lit avec lui dedans (`stayLine`). Avant, glisser d'une page à l'autre l'éjectait du lit. Deux places : `StationBehavior.seatFor(rang)` (rang d'arrivée dans
       `Occupancy`, lu par `positionInStation`) — le premier garde sa place quand le second sort.
       **`StationBehavior.sleepsInside`** (défaut = `holdsPet`) : « Dodo » (`BunnyService.startSleep`) le laisse dans
-      le lit comme dans la cage. Le lit n'est **pas** `holdsPet` (il ne suit pas l'animal d'une vue à l'autre).
+      le lit comme dans la cage.
     - 🥣 **Gamelle** (`BowlStation`, nourriture `Food.HAY`) : il renifle 1 s ; s'il a faim (satiété <
       `bowlHungryBelow` = 70 et repas non refusé), il mange 3 s (`Pose.EAT`, `eatProgress`) puis
       `PetEvent.Fed(HAY)` — un repas ordinaire ; sinon il ressort. **Écart** (à l'origine : il n'y allait pas tout

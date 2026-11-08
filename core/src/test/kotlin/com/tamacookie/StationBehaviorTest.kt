@@ -98,8 +98,8 @@ class StationBehaviorTest {
         assertEquals(Travel.IGNORES, VetStation.travel)
         assertEquals(Travel.IGNORES, CageStation.travel)
         for (k in StationKind.entries) if (k.behavior.acceptsPet) assertTrue("$k", k.behavior.blocksTravel)
-        // seule la cage garde l'animal d'une vue à l'autre ; décor animé : baignoire et roue (4a)
-        assertEquals(listOf(StationKind.CAGE), StationKind.entries.filter { it.behavior.holdsPet })
+        // la cage et le lit gardent l'animal d'une vue à l'autre ; décor animé : baignoire et roue (4a)
+        assertEquals(listOf(StationKind.CAGE, StationKind.BED), StationKind.entries.filter { it.behavior.holdsPet })
         assertEquals(listOf(StationKind.BATH, StationKind.WHEEL), StationKind.entries.filter { it.behavior.animated })
         // il s'endort dans la cage (qui le garde) et dans le lit
         assertEquals(listOf(StationKind.CAGE, StationKind.BED), StationKind.entries.filter { it.behavior.sleepsInside })
