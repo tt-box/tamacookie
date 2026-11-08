@@ -10,6 +10,7 @@ import com.tamacookie.feature.toy.PropSpec
 import com.tamacookie.feature.toy.Toy
 import com.tamacookie.feature.toy.ToyCtx
 import com.tamacookie.feature.toy.ToySpec
+import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.sign
 
@@ -123,6 +124,21 @@ class ToyController(private val ctx: PetCtx) {
     // =====================================================================
     //  Nourriture
     // =====================================================================
+
+    /**
+     * L'animal qui joue avec [toy] : le plus proche de ceux en partie (`PLAY`, ou en plein saut pour y revenir) ;
+     * personne en partie → l'animal courant (comme avant le multi-animal).
+     */
+    private fun playerOf(toy: Prop): Pet {
+        var best: Pet? = null
+        for (q in ctx.world.pets.values) {
+            val playing = q.act == Act.PLAY || (q.act == Act.AIR && q.body.afterAir == Act.PLAY)
+            if (!playing || !ctx.world.isShown(q)) continue
+            val b = best
+            if (b == null || abs(q.body.fx - toy.x) < abs(b.body.fx - toy.x)) best = q
+        }
+        return best ?: pet
+    }
 
     /** Objet qui jaillit de [from] au hasard (pas vers un animal). */
     private fun popRandom(p: Prop, from: Station, maxVxDp: Float, vyDp: Float) {
@@ -348,7 +364,11 @@ class ToyController(private val ctx: PetCtx) {
             p.age += dt
             val spin0 = p.spin
             when (val spec = p.spec) {
-                is ToySpec -> if (!toyHeldByUser) spec.step(tctx, pet, p, dt)
+                is ToySpec -> if (!toyHeldByUser) {
+                    // Contacts (coup de tête, tir…) avec l'animal qui joue, pas forcément l'animal courant
+                    val player = playerOf(p)
+                    ctx.world.asPet(player) { spec.step(tctx, player, p, dt) }
+                }
                 is FoodSpec -> {
                     if (!p.onGround) {
                         p.spin += 200f * dt

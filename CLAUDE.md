@@ -1321,7 +1321,11 @@ Principes :
   un dormeur à son réveil. Les jouets restent un seul à la fois (un nouveau remplace l'ancien), mais **sortent
   toujours** eux aussi (avant : « Chut… il dort » si l'animal courant dormait) et partent du coffre au hasard
   (`popRandom` ; vers lui seulement s'il est allé se servir) ; l'animal courant ne joue (`PlayStarted`) que s'il
-  est éveillé et libre — sinon un autre, au repos, vient jouer (`PetBehavior` : `IDLE` → `PLAY`). Un animal repu la mange quand même, sans effet
+  est éveillé et libre — sinon un autre, au repos, vient jouer (`PetBehavior` : `IDLE` → `PLAY`).
+  **Contacts du jouet** (coup de tête du ballon, tir dans la balle…) : `ToySpec.step` reçoit l'animal **qui joue**
+  (`ToyController.playerOf` : le plus proche en `PLAY` ou en saut pour y revenir ; personne → l'animal courant,
+  comme avant) et tourne sous `World.asPet(joueur)` — avant, c'était toujours le résident : un compagnon qui jouait
+  pendant que le résident dormait n'avait aucun contact (« pas de hit box »). Un animal repu la mange quand même, sans effet
   (`Fed` refusé) : « J'ai plus faim ! » au lieu des cœurs. Tests : `ToyControllerTest`, `DirectorTest`.
 
 #### Schéma de persistance v1
