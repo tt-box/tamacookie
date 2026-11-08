@@ -10,7 +10,8 @@ import com.tamacookie.Pose
 /**
  * Lit (deux places) : il s'y endort et y récupère plus vite (`PetEvent.Rested`, en plus du temps qui
  * passe). Pas fatigué, il s'y assoit un instant et ressort. Réveillé (caresse, énergie pleine), il saute
- * du lit ; le sortir le réveille en douceur. « Dodo » ne le fait pas sortir ([sleepsInside]).
+ * du lit ; le sortir le réveille en douceur. « Dodo » ne le fait pas sortir ([sleepsInside]). Il garde son
+ * occupant ([holdsPet]) : changer de page ou d'app ne le fait pas sortir, il reste dans le lit.
  */
 object BedStation : StationBehavior {
     /** Réplique « occupé » (on lui propose autre chose). */
@@ -34,6 +35,9 @@ object BedStation : StationBehavior {
     override val capacity = 2
     override val slowFrames = true
     override val sleepsInside = true
+    /** Il reste dans son lit quand on change de page ou d'app : il disparaît avec le lit et revient avec lui. */
+    override val holdsPet = true
+    override val stayLine = "Le lit reste où il est… je dors dedans ! 💤"
     override val seat = LEFT
     override val occupiedLine = "Chut, je suis au lit ! 💤"
 

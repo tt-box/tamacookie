@@ -273,6 +273,34 @@ class StationControllerTest {
         assertEquals(0.25f, s.t, 1e-6f)
     }
 
+    @Test fun `le lit garde le lapin endormi quand on change de page, il revient avec lui`() {
+        install(StationKind.BED)
+        pet.stats = pet.stats.copy(energy = 30f)
+        sc.enterStation(StationKind.BED)
+        assertEquals(StationKind.BED, sc.holdingStation(pet))   // le service ne le fait donc pas sortir
+        ctx.pages.currentView = "com.app.autre"
+        sc.followHolder(StationKind.BED, pet)
+        assertTrue(ctx.isAway(pet))                              // disparu avec le lit
+        assertEquals(StationKind.BED, ctx.world.stationOf(pet))
+        assertTrue(pet.stats.sleeping)
+        ctx.pages.currentView = here
+        sc.followHolder(StationKind.BED, pet)
+        assertFalse(ctx.isAway(pet))                             // de retour, toujours au lit
+        assertEquals(StationKind.BED, ctx.world.stationOf(pet))
+        assertTrue(pet.stats.sleeping)
+    }
+
+    @Test fun `on ne deplace pas le lit avec lui dedans`() {
+        install(StationKind.BED)
+        pet.stats = pet.stats.copy(energy = 30f)
+        sc.enterStation(StationKind.BED)
+        ctx.pages.currentView = "com.app.autre"
+        ctx.said.clear()
+        sc.toggleStation(StationKind.BED)
+        assertEquals(BedStation.stayLine, ctx.said.single())
+        assertEquals(here, sc[StationKind.BED].anchor)
+    }
+
     @Test fun `deux animaux dans le lit, chacun a sa place`() {
         val s = install(StationKind.BED)
         val other = ctx.addPet("seconde")
