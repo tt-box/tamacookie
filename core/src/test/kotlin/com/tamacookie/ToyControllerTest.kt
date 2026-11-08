@@ -184,6 +184,19 @@ class ToyControllerTest {
         assertEquals(Act.SLEEP, pet.act)
     }
 
+    @Test fun `le ballon rebondit sur la tete du compagnon qui joue, meme si le residant dort`() {
+        val b = ctx.addPet("b", x = 900f, seed = 3)
+        pet.stats = pet.stats.copy(sleeping = true); pet.setAct(Act.SLEEP); pet.body.fx = 200f
+        toys.startPlay(Toy.BALLOON)
+        val t = ctx.world.currentToy()!!
+        b.setAct(Act.PLAY)
+        val d = ctx.arena.d
+        t.x = b.body.fx; t.vx = 0f; t.vy = 0f
+        t.y = (b.body.fy - 85 * d) + t.h - t.w / 2f      // centre du ballon sur sa tête
+        frame()
+        assertTrue(t.vy < -400 * d)
+    }
+
     @Test fun `du coffre, le jouet part au hasard`() {
         val chest = Station(com.tamacookie.feature.station.StationKind.CHEST, 100, 100)
         val speeds = HashSet<Float>()
