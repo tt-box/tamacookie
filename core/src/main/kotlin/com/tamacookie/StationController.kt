@@ -523,7 +523,7 @@ class StationController(
             toys.feed(f, from = s, aimed = true)
         } else {
             val t = if (rnd.nextFloat() < 0.5f) pet.favoriteToy else Toy.values()[rnd.nextInt(Toy.values().size)]
-            toys.startPlay(t, from = s)
+            toys.startPlay(t, from = s, aimed = true)
         }
         ctx.lastInteraction = keep
     }

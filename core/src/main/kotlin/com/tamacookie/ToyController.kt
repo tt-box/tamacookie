@@ -124,18 +124,15 @@ class ToyController(private val ctx: PetCtx) {
     //  Nourriture
     // =====================================================================
 
-    /**
-     * Occupé (station, cache-cache) ou endormi : il le dit et refuse (nourriture, jouet).
-     * [noteFirst] : l'interaction compte même s'il dort (nourriture).
-     */
-    private fun refuses(pet: Pet, asleepLine: String, noteFirst: Boolean): Boolean {
-        if (ctx.sayIfBusy(pet)) return true
-        if (noteFirst) ctx.noteInteraction()
-        if (pet.stats.sleeping) { ctx.say(asleepLine); return true }
-        return false
+    /** Objet qui jaillit de [from] au hasard (pas vers un animal). */
+    private fun popRandom(p: Prop, from: Station, maxVxDp: Float, vyDp: Float) {
+        val rnd = ctx.rnd
+        p.x = from.cx; p.y = from.cy
+        p.vx = (rnd.nextFloat() * 2f - 1f) * maxVxDp * d
+        p.vy = vyDp * (0.8f + rnd.nextFloat() * 0.4f) * d
     }
 
-    /** L'objet jaillit du coffre [from] en direction de l'animal. */
+    /** L'objet jaillit du coffre [from] en direction de l'animal (il est allé se servir). */
     private fun popFrom(p: Prop, from: Station, maxVxDp: Float, vyDp: Float) {
         p.x = from.cx; p.y = from.cy
         p.vx = ((pet.body.fx - from.cx) * 0.9f).coerceIn(-maxVxDp * d, maxVxDp * d)
@@ -161,9 +158,7 @@ class ToyController(private val ctx: PetCtx) {
         if (from != null && aimed) {
             popFrom(c, from, maxVxDp = 600f, vyDp = -900f)
         } else if (from != null) {
-            c.x = from.cx; c.y = from.cy
-            c.vx = (rnd.nextFloat() * 2f - 1f) * 600f * d
-            c.vy = -(700f + rnd.nextFloat() * 400f) * d
+            popRandom(c, from, maxVxDp = 600f, vyDp = -900f)
         } else {
             c.x = arena.minX + rnd.nextFloat() * (arena.maxX - arena.minX)
             c.y = arena.topY + 60 * d
@@ -256,11 +251,10 @@ class ToyController(private val ctx: PetCtx) {
     // =====================================================================
     //  Jouets
     // =====================================================================
-    fun startPlay(toy: Toy, from: Station? = null) {
+    fun startPlay(toy: Toy, from: Station? = null, aimed: Boolean = false) {
         val rnd = ctx.rnd
         if (!pet.species.accepts(toy)) return
-        if (refuses(pet, CommonLines.ASLEEP_NO_PLAY, noteFirst = false)) return
-        if (ctx.on(pet, PetEvent.PlayStarted).refused) { ctx.say(ctx.speech.pickFrom(TOO_TIRED)); return }
+        ctx.noteInteraction()
         props.filter { it.toy != null }.forEach { removeProp(it) }
         toyHeldByUser = false
         val spec = toy.spec
@@ -271,10 +265,13 @@ class ToyController(private val ctx: PetCtx) {
         p.x = (fx + facing * 70 * d).coerceIn(arena.minX, arena.maxX)
         p.y = fy - launch.aboveDp * d
         p.vx = facing * launch.vxDp * d; p.vy = launch.vyDp * d
-        if (from != null) popFrom(p, from, maxVxDp = 700f, vyDp = launch.chestVyDp)
+        if (from != null && aimed) popFrom(p, from, maxVxDp = 700f, vyDp = launch.chestVyDp)
+        else if (from != null) popRandom(p, from, maxVxDp = 700f, vyDp = launch.chestVyDp)
         placeProp(p)
         pet.mind.playTime = 0f; tctx.holdTime = 0f; tctx.catchCooldown = 0f
-        ctx.noteInteraction()
+        // Le jouet sort toujours : s'il dort ou est occupé, un autre (ou lui, plus tard) viendra jouer
+        if (pet.stats.sleeping || ctx.world.busy(pet)) return
+        if (ctx.on(pet, PetEvent.PlayStarted).refused) { ctx.say(ctx.speech.pickFrom(TOO_TIRED)); return }
         val fav = toy == pet.favoriteToy
         ctx.say(
             if (fav) ctx.pick(*favorite(toy.label))
@@ -283,6 +280,7 @@ class ToyController(private val ctx: PetCtx) {
         if (fav) { ctx.emit(pet, PType.HEART, 4); pet.express(Expr.HAPPY, 2f) }
         pet.setActOrAfterAir(Act.PLAY)
     }
+
 
     /** Act.PLAY : la partie dure un moment (plus s'il est joueur), le jouet fait le reste. */
     private fun updatePlay(pet: Pet, dt: Float) {

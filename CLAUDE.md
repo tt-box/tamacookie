@@ -994,7 +994,7 @@ Principes :
     (`ToyController` : `POOP_THANKS`, `favorite(label)`, `PLAY_OVER`, `TAKEN`, `BIG_THROW` à côté de `FULL` /
     `TOO_TIRED` ; `PageTracker` : `WANDER`, `BACK`, `desktopPage(n)` ; `MischiefController` : `IGNORED`,
     `oneAtATime(nom)`), leur fonctionnalité (`ChestStation.BUMPED` / `BUMPED_OPEN`, `VetStation.HEALTHY` / `HEALED`,
-    `HideSeekMischief.BUSY_LINE`), ou **`CommonLines`** (nouveau : `ASLEEP`, `ASLEEP_NO_PLAY` — partagées par les
+    `HideSeekMischief.BUSY_LINE`), ou **`CommonLines`** (nouveau : `ASLEEP` (et `ASLEEP_NO_PLAY`, retirée depuis que les jouets sortent même s'il dort) — partagées par les
     jouets, la nourriture et la brosse —, et les réponses de l'hôte aux commandes `HOUSE_FULL`, `goodbye(nom)`).
     Le titre et la ligne de la notification à plusieurs animaux (« · +2 compagnons », humeurs) passent de `Director`
     à `NotifierTexts` (`title`, `withCompanions`, `joinAlerts`). **Mêmes tirages** : `ctx.pick(*TABLEAU)` = même
@@ -1318,7 +1318,10 @@ Principes :
   animal court vers la plus proche (`Director.foodTarget`, qui remplace `mayChaseFood` ; perdues = un ensemble
   par animal) ; `foodWinner(f)` ne compte que ceux qui la visent — avec une seule nourriture, comme avant.
   L'animal courant n'y court que s'il est éveillé et libre ; les autres la remarquent (`PetBehavior.chasesFood`),
-  un dormeur à son réveil. Les jouets restent un seul à la fois (un nouveau remplace l'ancien). Un animal repu la mange quand même, sans effet
+  un dormeur à son réveil. Les jouets restent un seul à la fois (un nouveau remplace l'ancien), mais **sortent
+  toujours** eux aussi (avant : « Chut… il dort » si l'animal courant dormait) et partent du coffre au hasard
+  (`popRandom` ; vers lui seulement s'il est allé se servir) ; l'animal courant ne joue (`PlayStarted`) que s'il
+  est éveillé et libre — sinon un autre, au repos, vient jouer (`PetBehavior` : `IDLE` → `PLAY`). Un animal repu la mange quand même, sans effet
   (`Fed` refusé) : « J'ai plus faim ! » au lieu des cœurs. Tests : `ToyControllerTest`, `DirectorTest`.
 
 #### Schéma de persistance v1
