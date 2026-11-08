@@ -1308,6 +1308,13 @@ Principes :
     500 ms) ; texte du service dans Paramètres › Accessibilité ; mise à jour de l'APK par-dessus (le nouveau drapeau
     `flagReportViewIds` est pris sans réactiver le service ? sinon le désactiver / réactiver).
 
+- **Nourriture jamais refusée** (coffre, « Nourrir » de la notification et du widget) : depuis qu'elle n'est réservée
+  à personne, `ToyController.feed` la fait **toujours** sortir — même si l'animal courant dort, est occupé, ou si tous
+  sont repus (avant : « Chut… il dort », « J'ai plus faim ! » et rien ne sortait). Elle **remplace** une nourriture
+  encore au sol (une seule à la fois). L'animal courant n'y court que s'il est éveillé et libre ; les autres la
+  remarquent (`PetBehavior.chasesFood`), un dormeur à son réveil. Un animal repu la mange quand même, sans effet
+  (`Fed` refusé) : « J'ai plus faim ! » au lieu des cœurs. Tests : `ToyControllerTest` (+4).
+
 #### Schéma de persistance v1
 
 Fichier **`pets`** (SharedPreferences, `Prefs.PETS_FILE`) :
