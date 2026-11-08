@@ -142,11 +142,18 @@ class ToyController(private val ctx: PetCtx) {
         p.vy = vyDp * d
     }
 
-    /** Donne à manger. [from] = le coffre d'où sort la nourriture (sinon elle tombe du ciel). */
+    /**
+     * Donne à manger. [from] = le coffre d'où sort la nourriture (sinon elle tombe du ciel).
+     *
+     * La nourriture n'est à personne : elle sort même si l'animal courant dort ou est occupé (un autre, ou lui à son
+     * réveil, ira la manger — le plus proche l'emporte), et même si tous sont repus (elle attend au sol qu'un animal
+     * ait faim : ils vont la manger de toute façon). Elle remplace une nourriture encore au sol. L'animal courant y
+     * court lui-même s'il est libre et éveillé.
+     */
     fun feed(food: Food = Food.CARROT, from: Station? = null) {
-        if (refuses(pet, CommonLines.ASLEEP, noteFirst = true)) return
-        if (pet.wouldRefuse(PetEvent.Fed(food), ctx.clock.wallMs())) { ctx.say(ctx.speech.pickFrom(FULL)); return }
-        if (ctx.world.hasFood()) return
+        ctx.noteInteraction()
+        // Une seule nourriture au sol : la nouvelle remplace celle que personne n'a encore mangée.
+        props.filter { it.food != null }.forEach(::removeProp)
         val spec = food.spec
         val c = addProp(spec)
         val rnd = ctx.rnd
@@ -158,6 +165,7 @@ class ToyController(private val ctx: PetCtx) {
             c.vy = 0f
         }
         placeProp(c)
+        if (pet.stats.sleeping || ctx.world.busy(pet)) return
         pet.express(Expr.SURPRISED, 1f)
         ctx.say(ctx.speech.pickFrom(spec.lines), 2f)
         pet.setActOrAfterAir(Act.GOTO_FOOD)
@@ -191,10 +199,14 @@ class ToyController(private val ctx: PetCtx) {
         b.eatProgress = b.actTime / 3f
         if (b.actTime >= 3f) {
             b.eatProgress = 0f
-            ctx.on(pet, PetEvent.Fed(b.eatingFood))
-            ctx.emit(pet, PType.HEART, 3)
-            pet.express(Expr.HAPPY, 2f)
-            ctx.speech.sayOneOf(pet.species.lines.ATE)
+            if (ctx.on(pet, PetEvent.Fed(b.eatingFood)).refused) {
+                // Repu : il l'a mangée quand même (la nourriture n'est jamais refusée au coffre), sans effet
+                ctx.say(ctx.speech.pickFrom(FULL))
+            } else {
+                ctx.emit(pet, PType.HEART, 3)
+                pet.express(Expr.HAPPY, 2f)
+                ctx.speech.sayOneOf(pet.species.lines.ATE)
+            }
             pet.setAct(Act.IDLE, 3f)
         }
     }

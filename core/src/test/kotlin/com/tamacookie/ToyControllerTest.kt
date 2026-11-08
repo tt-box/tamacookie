@@ -91,6 +91,52 @@ class ToyControllerTest {
         assertEquals(3, ctx.emitted.count { it == PType.HEART })
     }
 
+    @Test fun `la nourriture sort meme s'il dort, il ne bouge pas et ne parle pas`() {
+        pet.stats = pet.stats.copy(satiety = 50f, sleeping = true)
+        pet.setAct(Act.SLEEP)
+        ctx.said.clear()
+        toys.feed(Food.LETTUCE)
+        val c = ctx.world.props.single()
+        assertEquals(Food.LETTUCE, c.food)
+        assertTrue(overlay.isAttached(c.windowId))
+        assertEquals(Act.SLEEP, pet.act)
+        assertTrue(ctx.said.isEmpty())
+    }
+
+    @Test fun `la nourriture sort meme s'il est repu, il y va quand meme`() {
+        pet.stats = pet.stats.copy(satiety = 100f)
+        toys.feed(Food.CARROT)
+        assertEquals(1, ctx.world.props.count { it.food != null })
+        assertEquals(Act.GOTO_FOOD, pet.act)
+    }
+
+    @Test fun `repu, il mange sans effet et le dit`() {
+        pet.stats = pet.stats.copy(satiety = 100f)
+        toys.feed(Food.CARROT)
+        val c = ctx.world.props.single()
+        c.onGround = true; c.x = pet.body.fx + 10f; c.y = ctx.arena.groundY
+        ctx.acts.handlerFor(pet)!!.update(pet, dt)
+        assertEquals(Act.EAT, pet.act)
+        val before = pet.stats
+        ctx.said.clear()
+        pet.body.actTime = 3f
+        ctx.acts.handlerFor(pet)!!.update(pet, dt)
+        assertEquals(before.satiety, pet.stats.satiety)
+        assertEquals(0, ctx.emitted.count { it == PType.HEART })
+        assertEquals(1, ctx.said.size)
+    }
+
+    @Test fun `une nouvelle nourriture remplace celle qui est au sol`() {
+        pet.stats = pet.stats.copy(satiety = 50f)
+        toys.feed(Food.CARROT)
+        val a = ctx.world.props.single()
+        toys.feed(Food.APPLE)
+        val b = ctx.world.props.single()
+        assertEquals(Food.APPLE, b.food)
+        assertFalse(overlay.isAttached(a.windowId))
+        assertTrue(overlay.isAttached(b.windowId))
+    }
+
     @Test fun `on lui prend le jouet qu'il tient, il proteste`() {
         toys.startPlay(Toy.PLUSH)
         val t = ctx.world.currentToy()!!
