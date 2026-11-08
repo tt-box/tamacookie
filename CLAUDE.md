@@ -570,7 +570,7 @@ Principes :
     (vérifié **avant** tout tirage : un refus ne consomme pas d'aléatoire), cache-cache du menu refusé si un autre
     joue ; coffre : `mayUseChest` (le cerveau ne le voit pas s'il est pris) ; stations de capacité 1 : déjà gardées
     par `Occupancy.canEnter` ; nourriture : `foodWinner` (le plus proche, puis le plus affamé, puis l'ordre du
-    monde), le perdant renonce (`loseFood` / `mayChaseFood`) et le différend est noté (`takeDisputes`) — **après
+    monde), le perdant renonce (`loseFood` / `foodTarget`) et le différend est noté (`takeDisputes`) — **après
     l'essai sur tablette** : la nourriture n'est à personne (même donnée au résident par le coffre ou « Nourrir »),
     un perdant y retourne dès qu'il est **devenu** le plus proche (on l'a déplacé) et l'ancien gagnant renonce à son
     tour ; un animal qui marche ou est assis la remarque aussi (`PetBehavior.chasesFood`, avant : au repos seulement) ; bulles : `BubbleQueue` (une réplique à l'écran à la fois ; un animal remplace toujours la
@@ -1310,10 +1310,16 @@ Principes :
 
 - **Nourriture jamais refusée** (coffre, « Nourrir » de la notification et du widget) : depuis qu'elle n'est réservée
   à personne, `ToyController.feed` la fait **toujours** sortir — même si l'animal courant dort, est occupé, ou si tous
-  sont repus (avant : « Chut… il dort », « J'ai plus faim ! » et rien ne sortait). Elle **remplace** une nourriture
-  encore au sol (une seule à la fois). L'animal courant n'y court que s'il est éveillé et libre ; les autres la
-  remarquent (`PetBehavior.chasesFood`), un dormeur à son réveil. Un animal repu la mange quand même, sans effet
-  (`Fed` refusé) : « J'ai plus faim ! » au lieu des cœurs. Tests : `ToyControllerTest` (+4).
+  sont repus (avant : « Chut… il dort », « J'ai plus faim ! » et rien ne sortait). **Lancer au hasard** : du coffre,
+  vitesse horizontale tirée dans ±600 dp/s (avant : visée sur l'animal courant) ; « Nourrir » la fait tomber
+  n'importe où sur la largeur de l'écran. Seul l'animal qui va se servir au coffre la reçoit vers lui
+  (`feed(aimed = true)`). **Plusieurs à la suite** : chacune reste jusqu'à ce qu'on la mange (plafond
+  `ToyController.MAX_FOODS` = 8 fenêtres : au-delà, la plus ancienne **posée** disparaît, jamais une en vol). Chaque
+  animal court vers la plus proche (`Director.foodTarget`, qui remplace `mayChaseFood` ; perdues = un ensemble
+  par animal) ; `foodWinner(f)` ne compte que ceux qui la visent — avec une seule nourriture, comme avant.
+  L'animal courant n'y court que s'il est éveillé et libre ; les autres la remarquent (`PetBehavior.chasesFood`),
+  un dormeur à son réveil. Les jouets restent un seul à la fois (un nouveau remplace l'ancien). Un animal repu la mange quand même, sans effet
+  (`Fed` refusé) : « J'ai plus faim ! » au lieu des cœurs. Tests : `ToyControllerTest`, `DirectorTest`.
 
 #### Schéma de persistance v1
 

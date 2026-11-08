@@ -23,7 +23,7 @@ enum class SpeechPriority {
  * - **coffre**, **gamelle** : un seul animal va s'y servir de lui-même ([mayHeadTo]) ; les stations de
  *   capacité 1 sont gardées par l'occupation du monde (`Occupancy.canEnter`) ;
  * - **nourriture** : quand deux animaux courent vers la même, le plus proche l'emporte ([foodWinner]),
- *   l'autre renonce à celle-ci ([mayChaseFood]) ;
+ *   l'autre renonce à celle-ci ([foodTarget]) ;
  * - **bulles** : une seule réplique à l'écran à la fois, les autres attendent par priorité ([bubbles]) ;
  * - **notifications** : un titre, une ligne et des alertes qui résument tous les animaux ([title], [alerts]).
  *
@@ -91,17 +91,18 @@ class Director(private val world: World) {
     // =====================================================================
     //  Nourriture : le plus proche l'emporte
     // =====================================================================
-    /** Animal → nourriture ([Prop.id]) qu'il a perdue au profit d'un autre (il n'y retourne pas). */
-    private val lostFood = HashMap<PetId, Int>()
+    /** Animal → nourritures ([Prop.id]) qu'il a perdues au profit d'un autre (il n'y retourne pas). */
+    private val lostFood = HashMap<PetId, MutableSet<Int>>()
 
     /**
-     * Parmi les animaux qui courent vers [food] (`GOTO_FOOD`), celui qui l'aura : le plus proche ; à égalité,
-     * le plus affamé ; puis l'ordre du monde (le résident d'abord).
+     * Parmi les animaux qui courent vers [food] (`GOTO_FOOD`, et c'est la nourriture la plus proche d'eux qu'ils
+     * n'ont pas perdue), celui qui l'aura : le plus proche ; à égalité, le plus affamé ; puis l'ordre du monde (le
+     * résident d'abord).
      */
     fun foodWinner(food: Prop): Pet? {
         var best: Pet? = null
         for (p in world.pets.values) {
-            if (p.act != Act.GOTO_FOOD || lostFood[p.id] == food.id) continue
+            if (p.act != Act.GOTO_FOOD || nearestFood(world, p, lostFood[p.id]) !== food) continue
             val b = best
             if (b == null) { best = p; continue }
             if (closer(p, b, food)) best = p
@@ -114,11 +115,11 @@ class Director(private val world: World) {
     private val disputes = ArrayList<Dispute>()
 
     /**
-     * [p] a perdu [food] au profit de [winner] : il n'y retourne pas (jusqu'à la prochaine nourriture), et le
+     * [p] a perdu [food] au profit de [winner] : il n'y retourne pas (il peut viser une autre nourriture), et le
      * différend est noté pour [takeDisputes].
      */
     fun loseFood(p: Pet, food: Prop, winner: Pet? = null) {
-        lostFood[p.id] = food.id
+        lostFood.getOrPut(p.id) { HashSet() } += food.id
         if (winner != null) disputes += Dispute(p.id, winner.id)
     }
 
@@ -129,20 +130,24 @@ class Director(private val world: World) {
     }
 
     /**
-     * [p] peut courir vers la nourriture posée. La nourriture n'est réservée à personne : le plus proche l'emporte
-     * ([foodWinner]). Un animal qui l'a perdue n'y retourne que s'il est **devenu** le plus proche (on l'a déplacé,
-     * ou la nourriture a bougé) — et l'ancien gagnant renonce à son tour.
+     * La nourriture vers laquelle [p] court, ou null : la plus proche de lui parmi celles posées. Plusieurs peuvent
+     * être au sol ; aucune n'est réservée, le plus proche l'emporte ([foodWinner]). Une nourriture qu'il a perdue
+     * redevient possible s'il est **devenu** le plus proche (on l'a déplacé, ou elle a bougé) — et l'ancien gagnant
+     * renonce à son tour.
      */
-    fun mayChaseFood(p: Pet): Boolean {
-        val lost = lostFood[p.id] ?: return true
-        val food = world.props.firstOrNull { it.id == lost && it.food != null }
-        if (food == null) { lostFood.remove(p.id); return true }   // disparue : il peut courir vers la suivante
-        val winner = foodWinner(food)
-        if (winner != null && !closer(p, winner, food)) return false
-        lostFood.remove(p.id)
-        return true
+    fun foodTarget(p: Pet): Prop? {
+        val lost = lostFood[p.id]
+        if (lost != null) {
+            lost.retainAll { id -> world.props.any { it.id == id && it.food != null } }   // disparues : oubliées
+            for (f in world.props) {
+                if (f.food == null || f.id !in lost) continue
+                val winner = foodWinner(f)
+                if (winner == null || closer(p, winner, f)) lost -= f.id
+            }
+            if (lost.isEmpty()) lostFood.remove(p.id)
+        }
+        return nearestFood(world, p, lostFood[p.id])
     }
-
 
     // =====================================================================
     //  Bulles : une à la fois, file par priorité
@@ -259,6 +264,17 @@ class Director(private val world: World) {
         /** Activités d'une bêtise (celles de [Mischiefs.ALL]). */
         val MISCHIEF_ACTS: Set<Act> = EnumSet.noneOf(Act::class.java).apply { for (m in Mischiefs.ALL) addAll(m.acts) }
     }
+}
+
+/** La nourriture posée la plus proche de [p], hors [lost]. */
+private fun nearestFood(world: World, p: Pet, lost: Set<Int>?): Prop? {
+    var best: Prop? = null
+    for (f in world.props) {
+        if (f.food == null || (lost != null && f.id in lost)) continue
+        val b = best
+        if (b == null || abs(p.body.fx - f.x) < abs(p.body.fx - b.x)) best = f
+    }
+    return best
 }
 
 /** [p] l'emporte sur [q] pour [food] : plus près, ou à égalité plus affamé (la règle de `Director.foodWinner`). */
