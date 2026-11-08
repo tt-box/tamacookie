@@ -132,8 +132,7 @@ class ToyController(private val ctx: PetCtx) {
     private fun playerOf(toy: Prop): Pet {
         var best: Pet? = null
         for (q in ctx.world.pets.values) {
-            val playing = q.act == Act.PLAY || (q.act == Act.AIR && q.body.afterAir == Act.PLAY)
-            if (!playing || !ctx.world.isShown(q)) continue
+            if (!isPlaying(q) || !ctx.world.isShown(q)) continue
             val b = best
             if (b == null || abs(q.body.fx - toy.x) < abs(b.body.fx - toy.x)) best = q
         }
@@ -305,16 +304,25 @@ class ToyController(private val ctx: PetCtx) {
         val toy = p?.toy
         if (p == null || toy == null) { pet.setAct(Act.IDLE); return }
         val limit = pet.species.behavior(pet.personality).playSeconds
-        if (pet.mind.playTime > limit || pet.stats.energy < ctx.rules.playStopEnergyBelow) { endPlay(p); return }
+        if (pet.mind.playTime > limit || pet.stats.energy < ctx.rules.playStopEnergyBelow) { endPlay(pet, p); return }
         toy.spec.play(tctx, pet, p, dt)
     }
 
-    private fun endPlay(p: Prop) {
-        removeProp(p)
+    /**
+     * [pet] a assez joué (durée de partie ou fatigue) : lui seul s'arrête et ne revient pas à ce jouet
+     * ([Mind.playedOut]). Le jouet ne disparaît que si plus personne ne joue avec.
+     */
+    private fun endPlay(pet: Pet, p: Prop) {
+        pet.mind.playedOut = p.id
+        val others = ctx.world.pets.values.any { it !== pet && ctx.world.isShown(it) && isPlaying(it) }
+        if (!others) removeProp(p)
         ctx.say(ctx.pick(*PLAY_OVER))
         pet.express(Expr.HAPPY, 2f)
         pet.setAct(Act.IDLE, 4f)
     }
+
+
+
 
     // =====================================================================
     //  Gestes sur un jouet (reçus de sa fenêtre)
@@ -397,3 +405,6 @@ class ToyController(private val ctx: PetCtx) {
         val BIG_THROW = arrayOf("Waouh, quel lancer !", "J'y vais !")
     }
 }
+
+/** [p] est en partie : il joue, ou il est en plein saut pour y revenir. */
+private fun isPlaying(p: Pet) = p.act == Act.PLAY || (p.act == Act.AIR && p.body.afterAir == Act.PLAY)

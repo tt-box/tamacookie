@@ -1325,7 +1325,13 @@ Principes :
   **Contacts du jouet** (coup de tête du ballon, tir dans la balle…) : `ToySpec.step` reçoit l'animal **qui joue**
   (`ToyController.playerOf` : le plus proche en `PLAY` ou en saut pour y revenir ; personne → l'animal courant,
   comme avant) et tourne sous `World.asPet(joueur)` — avant, c'était toujours le résident : un compagnon qui jouait
-  pendant que le résident dormait n'avait aucun contact (« pas de hit box »). Un animal repu la mange quand même, sans effet
+  pendant que le résident dormait n'avait aucun contact (« pas de hit box »).
+  **Fin de partie par animal** : celui qui a assez joué (durée de `BehaviorMods.playSeconds` ou fatigue) s'arrête
+  **seul** et ne revient pas à ce jouet (`Mind.playedOut` = son id) ; le jouet ne disparaît que si plus personne ne
+  joue avec. Se joindre à une partie (`PetBehavior.joinsPlay`, `IDLE` → `PLAY`) remet son temps de jeu à zéro et
+  demande assez d'énergie (≥ `playStopEnergyBelow`) — avant, un compagnon arrivait avec le temps de ses parties
+  précédentes (ou fatigué) et rangeait le jouet aussitôt (« le ballon sort et disparaît de suite »).
+  Tests : `SharedPlayTest`. Un animal repu la mange quand même, sans effet
   (`Fed` refusé) : « J'ai plus faim ! » au lieu des cœurs. Tests : `ToyControllerTest`, `DirectorTest`.
 
 #### Schéma de persistance v1
