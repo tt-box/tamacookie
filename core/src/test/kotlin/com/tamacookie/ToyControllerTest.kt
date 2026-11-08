@@ -173,6 +173,28 @@ class ToyControllerTest {
         assertTrue(pet.body.facing < 0f)
     }
 
+    @Test fun `le jouet sort meme s'il dort, il ne bouge pas`() {
+        pet.stats = pet.stats.copy(sleeping = true)
+        pet.setAct(Act.SLEEP)
+        val chest = Station(com.tamacookie.feature.station.StationKind.CHEST, 100, 100)
+        toys.startPlay(Toy.BALLOON, from = chest)
+        val t = ctx.world.currentToy()!!
+        assertEquals(Toy.BALLOON, t.toy)
+        assertTrue(overlay.isAttached(t.windowId))
+        assertEquals(Act.SLEEP, pet.act)
+    }
+
+    @Test fun `du coffre, le jouet part au hasard`() {
+        val chest = Station(com.tamacookie.feature.station.StationKind.CHEST, 100, 100)
+        val speeds = HashSet<Float>()
+        repeat(6) {
+            pet.setAct(Act.IDLE)
+            toys.startPlay(Toy.BALL, from = chest)
+            speeds += ctx.world.currentToy()!!.vx
+        }
+        assertTrue(speeds.any { it < 0f } && speeds.any { it > 0f })
+    }
+
     @Test fun `on lui prend le jouet qu'il tient, il proteste`() {
         toys.startPlay(Toy.PLUSH)
         val t = ctx.world.currentToy()!!
