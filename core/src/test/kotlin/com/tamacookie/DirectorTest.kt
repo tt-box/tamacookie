@@ -111,13 +111,32 @@ class DirectorTest {
         // … et le différend est noté pour le système social (qui met la dispute en scène)
         assertEquals(listOf(Director.Dispute(a.id, b.id)), dir.takeDisputes())
         assertTrue(dir.takeDisputes().isEmpty())
-        assertFalse(dir.mayChaseFood(a))
-        assertTrue(dir.mayChaseFood(b))
+        assertFalse((dir.foodTarget(a) != null))
+        assertTrue((dir.foodTarget(b) != null))
         // le gagnant mange
         repeat(200) { if (b.act == Act.GOTO_FOOD) ctx.world.asPet(b) { ctx.acts.handlerFor(b)!!.update(b, 0.05f) } }
         assertEquals(Act.EAT, b.act)
         // la nourriture a disparu : il pourra courir vers la prochaine
-        assertTrue(dir.mayChaseFood(a))
+        assertNull(dir.foodTarget(a))
+        toys.feed(Food.APPLE)
+        assertSame(ctx.world.props.single { it.food != null }, dir.foodTarget(a))
+    }
+
+    @Test fun nourriture_deuxNourritures_chacunLaSienneSansDispute() {
+        val b = ctx.addPet("b", x = 900f, seed = 3)
+        val toys = ToyController(ctx)
+        toys.registerActs(ctx.acts)
+        a.body.fx = 200f
+        toys.feed(Food.CARROT); toys.feed(Food.LETTUCE)
+        val (f1, f2) = ctx.world.props.filter { it.food != null }
+        for (f in listOf(f1, f2)) { f.y = ctx.arena.groundY; f.onGround = true; f.vx = 0f; f.vy = 0f }
+        f1.x = 250f; f2.x = 850f
+        a.setAct(Act.GOTO_FOOD); b.setAct(Act.GOTO_FOOD)
+        assertSame(f1, dir.foodTarget(a)); assertSame(f2, dir.foodTarget(b))
+        assertSame(a, dir.foodWinner(f1)); assertSame(b, dir.foodWinner(f2))
+        ctx.world.asPet(a) { ctx.acts.handlerFor(a)!!.update(a, 0.05f) }
+        ctx.world.asPet(b) { ctx.acts.handlerFor(b)!!.update(b, 0.05f) }
+        assertTrue(dir.takeDisputes().isEmpty())
     }
 
     @Test fun nourriture_personneNEstServi_leperdantRapprocheLaReprend() {
@@ -131,10 +150,10 @@ class DirectorTest {
         a.setAct(Act.GOTO_FOOD); b.setAct(Act.GOTO_FOOD)
         ctx.world.asPet(a) { ctx.acts.handlerFor(a)!!.update(a, 0.05f) }
         assertEquals(Act.IDLE, a.act)                            // … mais le compagnon est plus près : a renonce
-        assertFalse(dir.mayChaseFood(a))
+        assertFalse((dir.foodTarget(a) != null))
         // on déplace a tout contre la nourriture : il y retourne, et b renonce à son tour
         a.body.fx = 860f
-        assertTrue(dir.mayChaseFood(a))
+        assertTrue((dir.foodTarget(a) != null))
         a.setAct(Act.GOTO_FOOD)
         assertSame(a, dir.foodWinner(food))
         dir.takeDisputes()
@@ -170,7 +189,7 @@ class DirectorTest {
         val food = ctx.world.props.single { it.food != null }
         a.setAct(Act.GOTO_FOOD)
         assertSame(a, dir.foodWinner(food))
-        assertTrue(dir.mayChaseFood(a))
+        assertTrue((dir.foodTarget(a) != null))
     }
 
     // --- Bulles ---

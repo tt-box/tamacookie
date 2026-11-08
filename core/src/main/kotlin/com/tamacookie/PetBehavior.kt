@@ -294,7 +294,7 @@ class PetBehavior(private val ctx: PetCtx, private val hooks: Hooks) {
      * l'emporte (`Director.foodWinner`), et un perdant n'y retourne que s'il est devenu le plus proche.
      */
     private fun chasesFood(p: Pet): Boolean {
-        if (!ctx.world.hasFood() || !ctx.director.mayChaseFood(p)) return false
+        if (!ctx.world.hasFood() || ctx.director.foodTarget(p) == null) return false
         p.setAct(Act.GOTO_FOOD)
         return true
     }

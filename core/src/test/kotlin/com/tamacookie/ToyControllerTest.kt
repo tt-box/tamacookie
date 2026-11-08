@@ -6,6 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -126,15 +127,50 @@ class ToyControllerTest {
         assertEquals(1, ctx.said.size)
     }
 
-    @Test fun `une nouvelle nourriture remplace celle qui est au sol`() {
+    @Test fun `plusieurs nourritures a la suite, aucune ne disparait en vol`() {
         pet.stats = pet.stats.copy(satiety = 50f)
         toys.feed(Food.CARROT)
         val a = ctx.world.props.single()
         toys.feed(Food.APPLE)
-        val b = ctx.world.props.single()
-        assertEquals(Food.APPLE, b.food)
-        assertFalse(overlay.isAttached(a.windowId))
-        assertTrue(overlay.isAttached(b.windowId))
+        toys.feed(Food.LETTUCE)
+        assertEquals(3, ctx.world.props.count { it.food != null })
+        assertTrue(ctx.world.props.all { overlay.isAttached(it.windowId) })
+        assertTrue(a in ctx.world.props)
+        repeat(10) { frame() }
+        assertEquals(3, ctx.world.props.count { it.food != null })
+    }
+
+    @Test fun `au-dela du plafond, la plus ancienne posee laisse la place`() {
+        pet.stats = pet.stats.copy(satiety = 50f, sleeping = true)
+        repeat(8) { toys.feed(Food.CARROT) }
+        val first = ctx.world.props.first()
+        repeat(200) { frame() }        // toutes posées
+        toys.feed(Food.APPLE)
+        assertEquals(8, ctx.world.props.count { it.food != null })
+        assertFalse(first in ctx.world.props)
+    }
+
+    @Test fun `du coffre, le lancer part au hasard et pas vers lui`() {
+        val chest = Station(com.tamacookie.feature.station.StationKind.CHEST, 100, 100)
+        val speeds = HashSet<Float>()
+        repeat(6) {
+            toys.feed(Food.CARROT, from = chest)
+            speeds += ctx.world.props.last().vx
+        }
+        assertTrue(speeds.size > 1)
+        assertTrue(speeds.any { it < 0f } && speeds.any { it > 0f })
+    }
+
+    @Test fun `il court vers la nourriture la plus proche`() {
+        pet.stats = pet.stats.copy(satiety = 50f)
+        toys.feed(Food.CARROT)
+        toys.feed(Food.APPLE)
+        val (a, b) = ctx.world.props.filter { it.food != null }
+        for (c in listOf(a, b)) { c.onGround = true; c.y = ctx.arena.groundY; c.vx = 0f; c.vy = 0f }
+        a.x = pet.body.fx + 400f; b.x = pet.body.fx - 50f
+        assertSame(b, ctx.director.foodTarget(pet))
+        ctx.acts.handlerFor(pet)!!.update(pet, dt)
+        assertTrue(pet.body.facing < 0f)
     }
 
     @Test fun `on lui prend le jouet qu'il tient, il proteste`() {

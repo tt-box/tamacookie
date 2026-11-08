@@ -145,35 +145,42 @@ class ToyController(private val ctx: PetCtx) {
     /**
      * Donne à manger. [from] = le coffre d'où sort la nourriture (sinon elle tombe du ciel).
      *
-     * La nourriture n'est à personne : elle sort même si l'animal courant dort ou est occupé (un autre, ou lui à son
-     * réveil, ira la manger — le plus proche l'emporte), et même si tous sont repus (elle attend au sol qu'un animal
-     * ait faim : ils vont la manger de toute façon). Elle remplace une nourriture encore au sol. L'animal courant y
-     * court lui-même s'il est libre et éveillé.
+     * La nourriture n'est à personne : elle sort toujours — même si l'animal courant dort, est occupé ou repu — et
+     * part **au hasard** (pas vers lui) ; [aimed] = vers lui (il est allé se servir au coffre). On peut en envoyer
+     * plusieurs à la suite : chacune reste jusqu'à ce qu'un animal la mange (au-delà de [MAX_FOODS], la plus
+     * ancienne déjà posée disparaît). Chaque animal court vers la plus proche (`Director.foodTarget`) ; l'animal
+     * courant y court lui-même s'il est libre et éveillé.
      */
-    fun feed(food: Food = Food.CARROT, from: Station? = null) {
+    fun feed(food: Food = Food.CARROT, from: Station? = null, aimed: Boolean = false) {
         ctx.noteInteraction()
-        // Une seule nourriture au sol : la nouvelle remplace celle que personne n'a encore mangée.
-        props.filter { it.food != null }.forEach(::removeProp)
+        val foods = props.filter { it.food != null }
+        if (foods.size >= MAX_FOODS) foods.firstOrNull { it.onGround }?.let(::removeProp)
         val spec = food.spec
         val c = addProp(spec)
         val rnd = ctx.rnd
-        if (from != null) {
+        if (from != null && aimed) {
             popFrom(c, from, maxVxDp = 600f, vyDp = -900f)
+        } else if (from != null) {
+            c.x = from.cx; c.y = from.cy
+            c.vx = (rnd.nextFloat() * 2f - 1f) * 600f * d
+            c.vy = -(700f + rnd.nextFloat() * 400f) * d
         } else {
-            c.x = (pet.body.fx + (if (rnd.nextBoolean()) 1 else -1) * (90 + rnd.nextFloat() * 120) * d).coerceIn(arena.minX, arena.maxX)
+            c.x = arena.minX + rnd.nextFloat() * (arena.maxX - arena.minX)
             c.y = arena.topY + 60 * d
             c.vy = 0f
         }
         placeProp(c)
-        if (pet.stats.sleeping || ctx.world.busy(pet)) return
+        val already = pet.act == Act.GOTO_FOOD || pet.act == Act.EAT
+        if (pet.stats.sleeping || ctx.world.busy(pet) || already) return
         pet.express(Expr.SURPRISED, 1f)
         ctx.say(ctx.speech.pickFrom(spec.lines), 2f)
         pet.setActOrAfterAir(Act.GOTO_FOOD)
     }
 
+
     /** Act.GOTO_FOOD : il attend que la nourriture tombe puis court la manger. */
     private fun updateGoToFood(pet: Pet, dt: Float) {
-        val c = props.firstOrNull { it.food != null }
+        val c = ctx.director.foodTarget(pet)
         val food = c?.food
         if (c == null || food == null) { pet.setAct(Act.IDLE); return }
         if (!c.onGround) {
@@ -361,6 +368,8 @@ class ToyController(private val ctx: PetCtx) {
 
     /** Répliques des repas et des parties (indépendantes de l'espèce ; l'ordre fixe les tirages). */
     private companion object {
+        /** Nourritures au sol en même temps, au plus (une fenêtre chacune). */
+        const val MAX_FOODS = 8
         val FULL = arrayOf("J'ai plus faim !", "Mon ventre va exploser !")
         val TOO_TIRED = arrayOf("Trop fatigué… 😴", "Plus tard, j'ai plus d'énergie")
         val POOP_THANKS = arrayOf("Merci ! ✨", "Ouf, ça sentait…", "Tu es le meilleur !")

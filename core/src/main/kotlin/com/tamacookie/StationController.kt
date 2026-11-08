@@ -520,7 +520,7 @@ class StationController(
                 rnd.nextFloat() < 0.7f -> Food.CARROT
                 else -> Food.STRAWBERRY
             }
-            toys.feed(f, from = s)
+            toys.feed(f, from = s, aimed = true)
         } else {
             val t = if (rnd.nextFloat() < 0.5f) pet.favoriteToy else Toy.values()[rnd.nextInt(Toy.values().size)]
             toys.startPlay(t, from = s)
