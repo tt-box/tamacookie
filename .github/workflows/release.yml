@@ -68,39 +68,43 @@ jobs:
         with:
           cache-read-only: true
 
-      - name: Tests unitaires
-        run: ./gradlew --no-daemon :core:test testDebugUnitTest
-
-      # APK et AAB non signés : construits AVANT le décodage des clés, sans aucun secret dans
-      # l'environnement — ils ne peuvent pas être signés. L'APK est publié tel quel (à signer
-      # soi-même) ; l'AAB est signé plus bas avec la clé d'upload du Play Store.
-      - name: APK et AAB release non signés
+      # Un seul appel Gradle (une JVM, une configuration) : tests, puis APK et AAB release NON signés.
+      # Un test en échec fait échouer le build, donc l'étape : rien n'est signé ni publié. Tout est
+      # construit sans aucun secret dans l'environnement — l'APK et l'AAB ne peuvent pas être signés
+      # par Gradle ; ils le sont plus bas par apksigner / jarsigner, hors de Gradle.
+      - name: Tests unitaires, APK et AAB release non signés
         env:
           VERSION_NAME: ${{ steps.version.outputs.name }}
           VERSION_CODE: ${{ steps.version.outputs.code }}
         run: |
           set -euo pipefail
-          ./gradlew --no-daemon assembleRelease bundleRelease \
+          ./gradlew --no-daemon :core:test testDebugUnitTest assembleRelease bundleRelease \
             "-PversionName=$VERSION_NAME" \
             "-PversionCode=$VERSION_CODE"
           UNSIGNED=app/build/outputs/apk/release/app-release-unsigned.apk
           [ -f "$UNSIGNED" ] || { echo "::error::APK non signé introuvable"; exit 1; }
           AAB=app/build/outputs/bundle/release/app-release.aab
           [ -f "$AAB" ] || { echo "::error::AAB introuvable"; exit 1; }
-          jarsigner -J-Duser.language=en -verify "$AAB" | grep -q '^jar is unsigned' \
+          # Sortie capturée puis grep sur une chaîne (pas de `cmd | grep -q` : SIGPIPE avec pipefail).
+          aab_check="$(jarsigner -J-Duser.language=en -verify "$AAB")"
+          grep -q '^jar is unsigned' <<< "$aab_check" \
             || { echo "::error::L'AAB construit sans clé est signé"; exit 1; }
           mkdir -p "$RUNNER_TEMP/unsigned"
           mv "$UNSIGNED" "$RUNNER_TEMP/unsigned/"
           mv "$AAB" "$RUNNER_TEMP/unsigned/app-release-unsigned.aab"
 
-      # Une release n'est jamais signée avec la clé de debug : sans clé, on échoue.
-      - name: Clé de signature
+      # APK signé avec la clé de release (ECDSA P-256, PKCS12), hors de Gradle : mêmes schémas que la
+      # signingConfig de app/build.gradle.kts (v1 inutile en minSdk 36 ; v2, v3, v4). Mots de passe lus
+      # dans l'environnement par apksigner (`env:`), jamais sur la ligne de commande. Une release n'est
+      # jamais signée avec la clé de debug : sans clé, on échoue.
+      - name: APK release signé
         env:
           KEYSTORE_BASE64: ${{ secrets.TAMACOOKIE_KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.TAMACOOKIE_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.TAMACOOKIE_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.TAMACOOKIE_KEY_PASSWORD }}
         run: |
+          set -euo pipefail
           missing=""
           for s in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
             [ -n "${!s}" ] || missing="$missing TAMACOOKIE_$s"
@@ -109,21 +113,21 @@ jobs:
             echo "::error::Secrets de signature manquants :$missing"
             exit 1
           fi
-          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.p12"
-          echo "TAMACOOKIE_KEYSTORE=$RUNNER_TEMP/release.p12" >> "$GITHUB_ENV"
-
-      - name: APK release signé
-        env:
-          TAMACOOKIE_KEYSTORE_PASSWORD: ${{ secrets.TAMACOOKIE_KEYSTORE_PASSWORD }}
-          TAMACOOKIE_KEY_ALIAS: ${{ secrets.TAMACOOKIE_KEY_ALIAS }}
-          TAMACOOKIE_KEY_PASSWORD: ${{ secrets.TAMACOOKIE_KEY_PASSWORD }}
-          VERSION_NAME: ${{ steps.version.outputs.name }}
-          VERSION_CODE: ${{ steps.version.outputs.code }}
-        run: |
-          ./gradlew --no-daemon assembleRelease \
-            "-PversionName=$VERSION_NAME" \
-            "-PversionCode=$VERSION_CODE"
-          rm -f "$TAMACOOKIE_KEYSTORE"
+          BUILD_TOOLS="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          UNSIGNED="$RUNNER_TEMP/unsigned/app-release-unsigned.apk"
+          # Signer un APK mal aligné le rendrait inutilisable (alignement 4 octets, 16 Ko pour les .so).
+          "$BUILD_TOOLS/zipalign" -c -P 16 4 "$UNSIGNED" \
+            || { echo "::error::APK non signé mal aligné (zipalign -c)"; exit 1; }
+          KS="$RUNNER_TEMP/release.p12"
+          trap 'rm -f "$KS"' EXIT
+          echo "$KEYSTORE_BASE64" | base64 -d > "$KS"
+          mkdir -p "$RUNNER_TEMP/signed"
+          "$BUILD_TOOLS/apksigner" sign \
+            --ks "$KS" --ks-type PKCS12 --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass env:KEYSTORE_PASSWORD --key-pass env:KEY_PASSWORD \
+            --v1-signing-enabled false --v2-signing-enabled true \
+            --v3-signing-enabled true --v4-signing-enabled true \
+            --out "$RUNNER_TEMP/signed/app-release.apk" "$UNSIGNED"
 
       # AAB pour le Play Store : signé avec la CLÉ D'UPLOAD (RSA 4096, alias tamacookie-upload),
       # distincte de la clé des APK — le Play Store refuse une clé d'upload ECDSA. Google re-signe
@@ -153,8 +157,9 @@ jobs:
             -signedjar "$RUNNER_TEMP/signed/app-release.aab" \
             "$RUNNER_TEMP/unsigned/app-release-unsigned.aab" "$UPLOAD_KEY_ALIAS"
 
-      # Contrôle indépendant de Gradle : signature valide et certificat épinglé
+      # Contrôle indépendant de la signature : schémas attendus, signature valide et certificat épinglé
       # (ECDSA P-256, alias tamacookie-release). À mettre à jour en cas de rotation de clé.
+      # Sorties capturées puis grep sur une chaîne : pas de `cmd | grep -q` (SIGPIPE avec pipefail).
       - name: Vérifier la signature
         env:
           EXPECTED_CERT_SHA256: 839a8f9854abb247549496a8093c8268d06f5ad30735022a3faa5664b872523d
@@ -162,21 +167,28 @@ jobs:
           EXPECTED_UPLOAD_CERT_SHA256: 4a8d10047af4b8c157ab8d6657c0f94a7e88c545c52a8fd95f645291eb2cbea8
         run: |
           set -euo pipefail
-          APK=app/build/outputs/apk/release/app-release.apk
-          [ -f "$APK" ] || { echo "::error::APK signé introuvable (app-release-unsigned ?)"; exit 1; }
+          APK="$RUNNER_TEMP/signed/app-release.apk"
+          [ -f "$APK" ] || { echo "::error::APK signé introuvable"; exit 1; }
           APKSIGNER="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner"
-          out="$("$APKSIGNER" verify --verbose --print-certs "$APK")"
-          echo "$out" | grep -E "^Verified using|certificate DN|certificate SHA-256|key algorithm|key size"
-          actual="$(echo "$out" | grep -m1 'certificate SHA-256 digest' | awk '{print $NF}')"
+          [ -f "$APK.idsig" ] || { echo "::error::Signature v4 (.idsig) absente"; exit 1; }
+          out="$("$APKSIGNER" verify --verbose --print-certs --v4-signature-file "$APK.idsig" "$APK")"
+          grep -E "^Verified using|certificate DN|certificate SHA-256|key algorithm|key size" <<< "$out"
+          # minSdk 36 : apksig n'ajoute pas de bloc v2 quand v3 suffit — comme l'APK signé par Gradle (v0.5.0).
+          for scheme in "v3 scheme (APK Signature Scheme v3)" "v4 scheme (APK Signature Scheme v4)"; do
+            grep -qF "Verified using $scheme: true" <<< "$out" \
+              || { echo "::error::APK non signé avec le $scheme"; exit 1; }
+          done
+          actual="$(grep -m1 'certificate SHA-256 digest' <<< "$out" | awk '{print $NF}')"
           [ "$actual" = "$EXPECTED_CERT_SHA256" ] || { echo "::error::APK signé par $actual, attendu $EXPECTED_CERT_SHA256"; exit 1; }
           # AAB (format de publication du Play Store) : signature JAR par la clé d'upload.
           AAB="$RUNNER_TEMP/signed/app-release.aab"
           [ -f "$AAB" ] || { echo "::error::AAB signé introuvable"; exit 1; }
           # Pas de -strict : il refuse un certificat auto-signé (normal pour une clé d'app).
-          jarsigner -J-Duser.language=en -verify "$AAB" | grep -q '^jar verified' \
+          aab_check="$(jarsigner -J-Duser.language=en -verify "$AAB")"
+          grep -q '^jar verified' <<< "$aab_check" \
             || { echo "::error::Signature de l'AAB invalide"; exit 1; }
-          aab_cert="$(keytool -J-Duser.language=en -printcert -jarfile "$AAB" \
-            | grep -m1 'SHA256:' | awk '{print $NF}' | tr -d ':' | tr 'A-F' 'a-f')"
+          aab_certs="$(keytool -J-Duser.language=en -printcert -jarfile "$AAB")"
+          aab_cert="$(grep -m1 'SHA256:' <<< "$aab_certs" | awk '{print $NF}' | tr -d ':' | tr 'A-F' 'a-f')"
           [ "$aab_cert" = "$EXPECTED_UPLOAD_CERT_SHA256" ] \
             || { echo "::error::AAB signé par $aab_cert, attendu $EXPECTED_UPLOAD_CERT_SHA256"; exit 1; }
           echo "AAB signé par $aab_cert"
@@ -190,7 +202,7 @@ jobs:
           VERSION_NAME: ${{ steps.version.outputs.name }}
         run: |
           mkdir -p dist
-          cp app/build/outputs/apk/release/app-release.apk "dist/tamacookie-$VERSION_NAME.apk"
+          cp "$RUNNER_TEMP/signed/app-release.apk" "dist/tamacookie-$VERSION_NAME.apk"
           cp "$RUNNER_TEMP/unsigned/app-release-unsigned.apk" "dist/tamacookie-$VERSION_NAME-unsigned.apk"
           cp "$RUNNER_TEMP/signed/app-release.aab" "dist/tamacookie-$VERSION_NAME.aab"
           (cd dist && sha256sum *.apk *.aab > SHA256SUMS.txt)
