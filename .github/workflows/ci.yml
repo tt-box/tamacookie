@@ -36,7 +36,7 @@ jobs:
       # `detekt` (les deux modules) échoue sur tout problème absent des baselines (config/detekt/).
       # `--continue` : un échec de detekt n'empêche pas les tests, le lint et l'APK de tourner (et d'être rapportés).
       - name: Tests unitaires, couverture, detekt, lint et APK debug
-        run: ./gradlew --no-daemon --continue :core:test :core:jacocoTestReport testDebugUnitTest createDebugUnitTestCoverageReport detekt lintDebug assembleDebug
+        run: ./gradlew --continue :core:test :core:jacocoTestReport testDebugUnitTest createDebugUnitTestCoverageReport detekt lintDebug assembleDebug
 
       # Rapports detekt (HTML, SARIF, XML, Markdown) par module, même en cas d'échec ; le SARIF part ensuite
       # dans GitHub code scanning (job `detekt-sarif`).

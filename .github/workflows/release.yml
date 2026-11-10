@@ -78,7 +78,7 @@ jobs:
           VERSION_CODE: ${{ steps.version.outputs.code }}
         run: |
           set -euo pipefail
-          ./gradlew --no-daemon :core:test testDebugUnitTest assembleRelease bundleRelease \
+          ./gradlew :core:test testDebugUnitTest assembleRelease bundleRelease \
             "-PversionName=$VERSION_NAME" \
             "-PversionCode=$VERSION_CODE"
           UNSIGNED=app/build/outputs/apk/release/app-release-unsigned.apk
