@@ -49,7 +49,8 @@ versionnées, les problèmes existants y apparaissent donc tous).
   tests. `PetRepository.save()` ignore un animal qui n'est plus enregistré (remplacé par une adoption).
 - Les activités ne lisent l'animal que par le repository et n'écrivent que par `PetCommands` (le service est
   l'autorité quand il tourne).
-- **APK à installer : toujours `./gradlew clean assembleDebug`.** La compilation incrémentale de Kotlin a déjà
+- **APK à installer : toujours `./gradlew clean assembleDebug --no-build-cache`** (`clean` ne suffit plus depuis
+  le cache de build : une sortie de compilation périmée pourrait être resservie). La compilation incrémentale de Kotlin a déjà
   laissé une classe périmée (`TouchHandler$menuCtx$1`, délégation `PetCtx by ctx` compilée avant l'ajout de
   `PetCtx.rules`) : `AbstractMethodError` au toucher de « Dodo ». Le fil principal reste alors bloqué dans le
   gestionnaire de plantage et **toutes les fenêtres overlay sont figées** (même symptôme qu'une boucle arrêtée).
@@ -1335,6 +1336,27 @@ Principes :
   précédentes (ou fatigué) et rangeait le jouet aussitôt (« le ballon sort et disparaît de suite »).
   Tests : `SharedPlayTest`. Un animal repu la mange quand même, sans effet
   (`Fed` refusé) : « J'ai plus faim ! » au lieu des cœurs. Tests : `ToyControllerTest`, `DirectorTest`.
+
+- **CI et release plus rapides** (comportement de l'app inchangé) — 5 commits. Mesuré avant : CI 134 s (Gradle
+  114 s, **58 tâches sur 58 exécutées** à chaque fois, même pour un commit sans code — ~30 % des commits),
+  release 160 s (3 appels Gradle de ~10 s de démarrage + configuration chacun, `assembleRelease` lancé deux fois).
+  - `org.gradle.caching=true` : le cache (dans le Gradle User Home) est sauvegardé par setup-gradle depuis `main`
+    seulement et relu par les PR et la release (même commit que la CI de `main` : tests et compilation repris).
+  - `org.gradle.configuration-cache=true` (compatible : AGP 9.5, detekt alpha, `System.getenv`, keystore.properties
+    sont des entrées suivies). En CI il n'est conservé qu'avec `cache-encryption-key` = secret
+    **`GRADLE_ENCRYPTION_KEY`** ; **pas dans la release** (la clé serait exposée à la build non signée, pour un gain
+    nul : cache en lecture seule, ensemble de tâches propre à la release).
+  - `lint { ignoreTestSources = true }` : plus de `lintAnalyzeDebugUnitTest` / `…AndroidTest` (~10 s ;
+    `checkTestSources` était déjà faux).
+  - **Release** : un seul appel Gradle (tests + APK + AAB non signés, sans secret) ; l'APK est vérifié
+    (`zipalign -c -P 16 4`) puis signé **hors de Gradle** par `apksigner` (v1 désactivé, v2, v3, v4 : la
+    signingConfig ; `--ks-pass env:`), l'AAB par `jarsigner` comme avant. Vérification : v3 et v4 (avec le `.idsig`)
+    exigés, certificats épinglés inchangés. Avec minSdk 36, apksig n'écrit **pas de bloc v2** (v3 suffit) : c'était
+    déjà le cas de l'APK v0.5.0 signé par Gradle. La signingConfig de `app/build.gradle.kts` ne sert plus qu'en local.
+  - Appels Gradle sans `--no-daemon` (un démon à usage unique était forké de toute façon) ; `grep -q` sur une sortie
+    capturée (`<<<`), jamais `cmd | grep -q` sous `pipefail` (SIGPIPE).
+  - Non retenus : `org.gradle.parallel` (deux modules en chaîne), `checkReleaseBuilds = false` (lint vital de la
+    release, ~22 s : garde-fou gardé), R8 (désactivé), cache du SDK (rien n'est téléchargé), cron (aucun).
 
 #### Schéma de persistance v1
 
