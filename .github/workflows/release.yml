@@ -60,7 +60,10 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      # Cache en lecture seule : une release ne doit pas alimenter le cache partagé.
+      # Cache en lecture seule : une release ne doit pas alimenter le cache partagé. Pas de cache-encryption-key :
+      # setup-gradle la passerait à Gradle (GRADLE_ENCRYPTION_KEY) pendant la build non signée, et le cache de
+      # configuration n'y servirait pas — son entrée n'est écrite que par une release (ensemble de tâches propre),
+      # or le cache est en lecture seule ici. Le cache de BUILD (tâches), lui, est relu tel quel depuis main.
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
           cache-read-only: true
