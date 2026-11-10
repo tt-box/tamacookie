@@ -92,6 +92,9 @@ android {
         // Les avertissements existants sont figés dans la baseline ; tout nouveau problème bloque.
         baseline = file("lint-baseline.xml")
         abortOnError = true
+        // Pas d'analyse des sources de test (checkTestSources est déjà faux : elle ne rapportait presque rien) :
+        // supprime lintAnalyzeDebugUnitTest et lintAnalyzeDebugAndroidTest (≈ 10 s par CI).
+        ignoreTestSources = true
         // Étape 8c : les textes d'interface sont dans res/values/strings.xml — un texte en dur ou une
         // concaténation affichée fait échouer le build (au lieu d'un simple avertissement).
         error += listOf("HardcodedText", "SetTextI18n")
