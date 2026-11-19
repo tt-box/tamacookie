@@ -126,10 +126,16 @@ class ToyController(private val ctx: PetCtx) {
     // =====================================================================
 
     /**
-     * L'animal qui joue avec [toy] : le plus proche de ceux en partie (`PLAY`, ou en plein saut pour y revenir) ;
+     * L'animal qui joue avec [toy] : celui qui le tient ([Prop.holder], il l'a dans la gueule ou les pattes) ;
+     * sinon le plus proche de ceux en partie (`PLAY`, ou en plein saut pour y revenir) ;
      * personne en partie → l'animal courant (comme avant le multi-animal).
      */
     private fun playerOf(toy: Prop): Pet {
+        toy.holder?.let { id ->
+            val h = ctx.world.pets[id]
+            if (h != null && ctx.world.isShown(h)) return h
+            toy.holder = null; toy.onGround = false   // parti ou plus affiché : il l'a lâché
+        }
         var best: Pet? = null
         for (q in ctx.world.pets.values) {
             if (!isPlaying(q) || !ctx.world.isShown(q)) continue
@@ -283,7 +289,7 @@ class ToyController(private val ctx: PetCtx) {
         if (from != null && aimed) popFrom(p, from, maxVxDp = 700f, vyDp = launch.chestVyDp)
         else if (from != null) popRandom(p, from, maxVxDp = 700f, vyDp = launch.chestVyDp)
         placeProp(p)
-        pet.mind.playTime = 0f; tctx.holdTime = 0f; tctx.catchCooldown = 0f
+        pet.mind.playTime = 0f; pet.mind.crossing = false; tctx.holdTime = 0f; tctx.catchCooldown = 0f
         // Le jouet sort toujours : s'il dort ou est occupé, un autre (ou lui, plus tard) viendra jouer
         if (pet.stats.sleeping || ctx.world.busy(pet)) return
         if (ctx.on(pet, PetEvent.PlayStarted).refused) { ctx.say(ctx.speech.pickFrom(TOO_TIRED)); return }
@@ -314,6 +320,8 @@ class ToyController(private val ctx: PetCtx) {
      */
     private fun endPlay(pet: Pet, p: Prop) {
         pet.mind.playedOut = p.id
+        // il le lâche : les autres ne l'attendent pas
+        if (p.holder == pet.id) { p.holder = null; p.onGround = false }
         val others = ctx.world.pets.values.any { it !== pet && ctx.world.isShown(it) && isPlaying(it) }
         if (!others) removeProp(p)
         ctx.say(ctx.pick(*PLAY_OVER))
@@ -332,10 +340,12 @@ class ToyController(private val ctx: PetCtx) {
         toyHeldByUser = true
         ctx.noteInteraction()
         ctx.requestFrames()
-        if (t.held) {
-            t.held = false
-            if (t.toy?.spec?.complainsWhenTaken == true) {
-                pet.express(Expr.ANGRY, 1.2f)
+        val holder = t.holder?.let { ctx.world.pets[it] }
+        t.holder = null
+        // c'est celui qui le tenait qui proteste (pas forcément l'animal courant)
+        if (holder != null && t.toy?.spec?.complainsWhenTaken == true) {
+            ctx.world.asPet(holder) {
+                holder.express(Expr.ANGRY, 1.2f)
                 ctx.say(ctx.pick(*TAKEN), 1.6f)
             }
         }

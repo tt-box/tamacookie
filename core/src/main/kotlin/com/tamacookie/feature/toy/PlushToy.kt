@@ -26,15 +26,17 @@ object PlushToy : ToySpec {
         val a = ctx.arena
         val d = a.d
         val rnd = ctx.rnd
-        if (!p.held) {
+        if (p.holder == null) {
             if (!p.onGround) { pet.body.pose = Pose.IDLE; ctx.actor.faceToward(pet, p.x); return }
             if (ctx.actor.walkToward(pet, p.x, 150 * d, dt, stopDist = 22 * d)) {
-                p.held = true; ctx.holdTime = 0f
+                p.holder = pet.id; ctx.holdTime = 0f
                 ctx.hit(pet, Toy.PLUSH, 3f)
                 ctx.say(ctx.speech.pickFrom(GRABBED), 1.6f)
             }
             return
         }
+        // Un autre le tient : lui seul le relance
+        if (p.holder != pet.id) { pet.body.pose = Pose.IDLE; ctx.actor.faceToward(pet, p.x); return }
         val before = ctx.holdTime
         ctx.holdTime += dt
         val hug = ctx.holdTime
@@ -50,7 +52,7 @@ object PlushToy : ToySpec {
             }
             else -> {
                 if (pet.stats.energy < ctx.rules.plushNapEnergyBelow) { ctx.say(NAP); ctx.startSleep(pet); return }
-                p.held = false; p.onGround = false
+                p.holder = null; p.onGround = false
                 p.vy = -(650 + rnd.nextFloat() * 250) * d
                 p.vx = pet.body.facing * rnd.nextFloat() * 120 * d
                 ctx.catchCooldown = 0.5f
@@ -76,7 +78,7 @@ object PlushToy : ToySpec {
             if (ctx.catchCooldown <= 0f && act == Act.PLAY && !p.onGround &&
                 hypot(p.x - fx, (p.y - p.h / 2f) - (fy - 40 * d)) < 40 * d
             ) {
-                p.held = true; ctx.holdTime = 0f
+                p.holder = pet.id; ctx.holdTime = 0f
                 ctx.hit(pet, Toy.PLUSH, 3f)
             }
         }

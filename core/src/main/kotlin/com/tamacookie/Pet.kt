@@ -117,6 +117,8 @@ class Mind(val rnd: Random, species: Species = Species.DEFAULT) {
     var playedOut = -1
     /** Délai avant un nouveau coup de patte / de tête dans un jouet (s). */
     var kickCooldown = 0f
+    /** Tunnel : il le traverse (vers le bout opposé à celui par où il est entré). À lui seul, pas à la partie. */
+    var crossing = false
     var danceTime = 0f
     var danceHopIn = 0f
     /** Voyage d'app en app : réplique à l'arrivée et activité ensuite. */

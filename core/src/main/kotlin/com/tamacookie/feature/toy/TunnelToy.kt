@@ -9,8 +9,9 @@ import kotlin.math.abs
  * Tunnel : posé au sol, il y entre d'un côté et ressort de l'autre, encore et encore. Les fenêtres des
  * objets sont au-dessus de celle de l'animal (`WindowLayer`) : le tunnel le cache pendant la traversée.
  *
- * Phase dans [ToyCtx.holdTime] (0 = il va à l'entrée la plus proche, > 0 = il traverse), bout visé dans
- * `Body.targetX`, pause entre deux traversées dans `Mind.kickCooldown`.
+ * Phase dans `Mind.crossing` (faux = il va à l'entrée la plus proche, vrai = il traverse), bout visé dans
+ * `Body.targetX`, pause entre deux traversées dans `Mind.kickCooldown` : tout est à l'animal, pas à la partie
+ * (à deux, l'un ne ressort pas de la traversée de l'autre).
  */
 object TunnelToy : ToySpec {
     override val toy get() = Toy.TUNNEL
@@ -38,15 +39,15 @@ object TunnelToy : ToySpec {
         if (abs(b.targetX - left) > near && abs(b.targetX - right) > near) {
             // première fois (ou tunnel déplacé) : vers l'entrée la plus proche
             b.targetX = if (abs(b.fx - left) <= abs(b.fx - right)) left else right
-            ctx.holdTime = 0f
+            pet.mind.crossing = false
         }
         if (!ctx.actor.walkToward(pet, b.targetX, 190 * d, dt, stopDist = near)) return
-        if (ctx.holdTime > 0f) {
+        if (pet.mind.crossing) {
             // il vient de traverser
             ctx.hit(pet, Toy.TUNNEL, 3f)
             if (ctx.rnd.nextFloat() < 0.4f) ctx.say(ctx.speech.pickFrom(OUT), 1.4f)
         }
-        ctx.holdTime = 1f
+        pet.mind.crossing = true
         b.targetX = if (abs(b.targetX - left) <= near) right else left
         pet.mind.kickCooldown = 0.5f + ctx.rnd.nextFloat() * 0.8f
     }

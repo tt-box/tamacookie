@@ -21,22 +21,11 @@ object FrisbeeToy : ToySpec {
     private val CAUGHT = arrayOf("Attrapé ! 🥏", "Trop fort !", "Dans les dents !")
 
     override fun play(ctx: ToyCtx, pet: Pet, p: Prop, dt: Float) {
-        val a = ctx.arena
-        val d = a.d
-        val rnd = ctx.rnd
+        val d = ctx.arena.d
         if (p.held) {
-            ctx.holdTime += dt
-            pet.body.pose = Pose.IDLE
-            if (ctx.holdTime > 1.3f) {
-                val dir = if (pet.body.fx < a.screenW / 2) 1f else -1f
-                pet.body.facing = dir
-                p.held = false; p.onGround = false
-                p.x = pet.body.fx + dir * 30 * d; p.y = pet.body.fy - 40 * d
-                p.vx = dir * (750 + rnd.nextFloat() * 450) * d
-                p.vy = -(250 + rnd.nextFloat() * 250) * d
-                ctx.catchCooldown = 0.9f
-                if (rnd.nextFloat() < 0.35f) ctx.say(ctx.speech.pickFrom(THROWN), 1.4f)
-            }
+            // Lui seul relance le frisbee qu'il a dans la gueule ; un autre attend son lancer
+            if (p.holder == pet.id) holdThenThrow(ctx, pet, p, dt)
+            else { pet.body.pose = Pose.IDLE; ctx.actor.faceToward(pet, p.x) }
             return
         }
         val airborne = !p.onGround
@@ -49,6 +38,24 @@ object FrisbeeToy : ToySpec {
             pet.mind.kickCooldown = 0.6f
             ctx.actor.jump(pet, BunnyPhysics.impulseForHeight(pet.body.phys.gravity, (h - 30 * d).coerceAtLeast(10 * d)), dx * 2.5f, then = Act.PLAY)
         }
+    }
+
+    /** [pet] tient le frisbee : il le garde un instant puis le lance vers le milieu de l'écran. */
+    private fun holdThenThrow(ctx: ToyCtx, pet: Pet, p: Prop, dt: Float) {
+        val a = ctx.arena
+        val d = a.d
+        val rnd = ctx.rnd
+        ctx.holdTime += dt
+        pet.body.pose = Pose.IDLE
+        if (ctx.holdTime <= 1.3f) return
+        val dir = if (pet.body.fx < a.screenW / 2) 1f else -1f
+        pet.body.facing = dir
+        p.holder = null; p.onGround = false
+        p.x = pet.body.fx + dir * 30 * d; p.y = pet.body.fy - 40 * d
+        p.vx = dir * (750 + rnd.nextFloat() * 450) * d
+        p.vy = -(250 + rnd.nextFloat() * 250) * d
+        ctx.catchCooldown = 0.9f
+        if (rnd.nextFloat() < 0.35f) ctx.say(ctx.speech.pickFrom(THROWN), 1.4f)
     }
 
     override fun step(ctx: ToyCtx, pet: Pet, p: Prop, dt: Float) {
@@ -71,7 +78,7 @@ object FrisbeeToy : ToySpec {
                 hypot(p.x - mouthX, cy - (fy - 55 * d)) < 45 * d
             ) {
                 val wasFlying = !p.onGround
-                p.held = true; ctx.holdTime = 0f
+                p.holder = pet.id; ctx.holdTime = 0f
                 ctx.hit(pet, Toy.FRISBEE, if (wasFlying) 4f else 1f)
                 if (wasFlying && ctx.rnd.nextFloat() < 0.5f) ctx.say(ctx.speech.pickFrom(CAUGHT), 1.5f)
             }

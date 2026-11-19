@@ -127,8 +127,8 @@ class World {
     fun hasFood(): Boolean = props.any { it.food != null }
     fun hasToyOrFood(): Boolean = props.any { it.toy != null || it.food != null }
 
-    /** L'animal est attrapé par l'utilisateur : il lâche son jouet. */
-    fun dropHeldToy() {
-        currentToy()?.let { if (it.held) { it.held = false; it.onGround = false } }
+    /** [pet] est attrapé par l'utilisateur : il lâche son jouet (s'il le tient, pas celui d'un autre). */
+    fun dropHeldToy(pet: PetId) {
+        currentToy()?.let { if (it.holder == pet) { it.holder = null; it.onGround = false } }
     }
 }

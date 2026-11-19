@@ -212,7 +212,7 @@ class ToyControllerTest {
         toys.startPlay(Toy.PLUSH)
         val t = ctx.world.currentToy()!!
         assertTrue(overlay.isAttached(t.windowId))
-        t.held = true
+        t.holder = pet.id
         ctx.said.clear()
         toys.grab(t)
         assertFalse(t.held)

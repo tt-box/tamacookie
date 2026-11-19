@@ -161,7 +161,7 @@ class TouchHandler(
         pet.body.phys.airLandY = null
         stations.leaveStation(pet, hopOut = false)
         if (pet.stats.sleeping) ctx.on(pet, PetEvent.Woken(grumpy = true))
-        ctx.world.dropHeldToy()
+        ctx.world.dropHeldToy(pet.id)
         ctx.noteInteraction()
         pet.setAct(Act.DRAGGED)
         ctx.speech.sayOneOf(pet.species.lines.DRAGGED, 1.8f)

@@ -304,7 +304,7 @@ class StationController(
         occ.enter(p.id)
         setOccupied(s)
         p.body.platform = null; p.body.phys.airLandY = null; p.body.phys.stop()
-        ctx.world.currentToy()?.held = false
+        ctx.world.currentToy()?.let { if (it.holder == p.id) it.holder = null }
         positionInStation(p, k)
         p.setAct(Act.IN_STATION)
         k.behavior.onEnter(sctx, p, announce)

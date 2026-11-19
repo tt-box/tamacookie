@@ -30,15 +30,7 @@ object RopeToy : ToySpec {
     override fun play(ctx: ToyCtx, pet: Pet, p: Prop, dt: Float) {
         val d = ctx.arena.d
         val rnd = ctx.rnd
-        if (!p.held) {
-            if (!p.onGround || ctx.catchCooldown > 0f) { pet.body.pose = Pose.IDLE; ctx.actor.faceToward(pet, p.x); return }
-            if (ctx.actor.walkToward(pet, p.x, 160 * d, dt, stopDist = 24 * d)) {
-                p.held = true; ctx.holdTime = 0f
-                ctx.hit(pet, Toy.ROPE, 2.5f)
-                ctx.say(ctx.speech.pickFrom(GRABBED), 1.4f)
-            }
-            return
-        }
+        if (p.holder != pet.id) { approach(ctx, pet, p, dt); return }
         val before = ctx.holdTime
         ctx.holdTime += dt
         pet.body.pose = Pose.IDLE                  // il mâchouille (la corde secouée : voir step)
@@ -48,13 +40,28 @@ object RopeToy : ToySpec {
             if (rnd.nextFloat() < 0.4f) ctx.emit(pet, PType.NOTE)
         }
         if (ctx.holdTime >= CHEW_SECONDS) {
-            p.held = false; p.onGround = false
+            p.holder = null; p.onGround = false
             p.vx = -pet.body.facing * (150 + rnd.nextFloat() * 200) * d
             p.vy = -(380 + rnd.nextFloat() * 220) * d
             ctx.catchCooldown = 1f
             ctx.holdTime = 0f
             pet.body.pose = Pose.IDLE
             ctx.say(ctx.speech.pickFrom(TOSSED), 1.4f)
+        }
+    }
+
+    /**
+     * La corde n'est pas dans sa gueule : il va la prendre si elle est libre et posée ; en vol, juste relancée
+     * ou tenue par un autre (lui seul la relance), il la regarde.
+     */
+    private fun approach(ctx: ToyCtx, pet: Pet, p: Prop, dt: Float) {
+        if (p.held || !p.onGround || ctx.catchCooldown > 0f) {
+            pet.body.pose = Pose.IDLE; ctx.actor.faceToward(pet, p.x); return
+        }
+        if (ctx.actor.walkToward(pet, p.x, 160 * ctx.arena.d, dt, stopDist = 24 * ctx.arena.d)) {
+            p.holder = pet.id; ctx.holdTime = 0f
+            ctx.hit(pet, Toy.ROPE, 2.5f)
+            ctx.say(ctx.speech.pickFrom(GRABBED), 1.4f)
         }
     }
 

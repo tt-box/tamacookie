@@ -18,7 +18,9 @@ class Prop(val id: Int, val spec: PropSpec, val w: Int, val h: Int) : PropBody {
     override var vy = 0f
     override var onGround = false
     var age = 0f
-    var held = false          // tenu par le lapin
+    /** L'animal qui le tient (gueule, pattes) ; null = posé ou en vol. Lui seul le relance (jeu partagé). */
+    var holder: PetId? = null
+    val held: Boolean get() = holder != null
     var anchor = ""           // vue (app / page du bureau) où l'objet est posé
     /** Crotte : l'animal qui l'a faite (ramassée = ses jauges), null = objet partagé. */
     var owner: PetId? = null

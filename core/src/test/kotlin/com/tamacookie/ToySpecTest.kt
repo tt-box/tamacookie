@@ -193,6 +193,40 @@ class ToySpecTest {
     }
 
     @Test
+    fun `frisbee a deux - seul celui qui l'a attrape le relance, de sa gueule`() {
+        val ctx = FakeToyCtx()
+        val a = ctx.pet
+        val b = testPet(id = "copain")
+        b.body.fx = a.body.fx + 300f
+        val p = prop(ctx, Toy.FRISBEE, a.body.fx, above = 50f)
+        p.holder = a.id
+        // l'autre attend : bien plus que le temps de garde (1,3 s), il ne le lance pas
+        repeat(60) { FrisbeeToy.play(ctx, b, p, 0.05f) }
+        assertEquals(a.id, p.holder)
+        assertEquals(0f, ctx.holdTime, 0f)
+        // le jouet suit la gueule de celui qui le tient, même si l'autre est passé devant
+        FrisbeeToy.step(ctx, a, p, 0.05f)
+        assertEquals(a.body.fx + a.body.facing * 26f, p.x, 0.01f)
+        // c'est lui qui le lance, depuis sa position
+        var t = 0f
+        while (p.held) { FrisbeeToy.play(ctx, a, p, 0.05f); t += 0.05f; assertTrue("jamais lancé", t < 2f) }
+        assertEquals(a.body.fx, p.x - p.vx / kotlin.math.abs(p.vx) * 30f, 0.01f)
+    }
+
+    @Test
+    fun `corde a deux - l'autre ne la prend pas ni ne la relance`() {
+        val ctx = FakeToyCtx()
+        val a = ctx.pet
+        val b = testPet(id = "copain")
+        val p = prop(ctx, Toy.ROPE, a.body.fx)
+        p.holder = a.id
+        b.body.fx = p.x                       // juste à côté : il pourrait l'attraper si elle était libre
+        repeat((RopeToy.CHEW_SECONDS / 0.05f).toInt() + 20) { RopeToy.play(ctx, b, p, 0.05f) }
+        assertEquals(a.id, p.holder)
+        assertEquals(0f, ctx.holdTime, 0f)
+    }
+
+    @Test
     fun `tunnel - il entre d'un cote et ressort de l'autre, encore et encore`() {
         val ctx = FakeToyCtx()
         val pet = ctx.pet
@@ -213,5 +247,32 @@ class ToySpecTest {
         assertTrue("traversées : $crossings", crossings >= 4)
         assertTrue(pet.stats.happiness > 40f + crossings)        // chaque traversée fait plaisir
         assertEquals(0f, p.spin, 0f)
+    }
+
+    @Test
+    fun `tunnel a deux - chacun sa traversee, l'arrivee de l'autre ne compte pas`() {
+        val ctx = FakeToyCtx()
+        val a = ctx.pet
+        val b = testPet(id = "copain")
+        val p = prop(ctx, Toy.TUNNEL, 600f)
+        val (left, right) = TunnelToy.ends(ctx, p)
+        a.body.fx = left - 40f; b.body.fx = right + 300f
+        // a arrive à son entrée : il va traverser
+        var t = 0f
+        while (!a.mind.crossing) { TunnelToy.play(ctx, a, p, 1f / 60f); t += 1f / 60f; assertTrue(t < 3f) }
+        // b arrive à la sienne sans avoir traversé : ni joie ni « Coucou ! »
+        val happy = b.stats.happiness
+        val said = ctx.base.said.size
+        t = 0f
+        while (!b.mind.crossing) { TunnelToy.play(ctx, b, p, 1f / 60f); t += 1f / 60f; assertTrue(t < 5f) }
+        assertEquals(happy, b.stats.happiness, 0f)
+        assertEquals(said, ctx.base.said.size)
+        // et l'entrée de b n'a pas effacé la traversée de a : a ressort de l'autre côté, content
+        val before = a.stats.happiness
+        a.mind.kickCooldown = 0f
+        t = 0f
+        while (a.mind.kickCooldown <= 0f) { TunnelToy.play(ctx, a, p, 1f / 60f); t += 1f / 60f; assertTrue(t < 5f) }
+        assertEquals(right, a.body.fx, 2f)
+        assertTrue(a.stats.happiness > before)
     }
 }
