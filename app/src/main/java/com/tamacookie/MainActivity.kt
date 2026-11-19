@@ -373,9 +373,10 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         setPerm(a11yBtn, a11y, R.string.main_perm_a11y, R.string.main_perm_a11y_why)
         a11yHelp.visibility = if (a11y) View.GONE else View.VISIBLE
 
-        val running = BunnyService.running
+        // « Ranger » du menu le cache sans arrêter le service : il faut alors proposer de le faire apparaître
+        val shown = BunnyService.running && BunnyService.visible
         val name = nameEdit.text.toString()
-        mainBtn.text = if (running) getString(R.string.main_stop_pet, name)
+        mainBtn.text = if (shown) getString(R.string.main_stop_pet, name)
         else getString(R.string.main_start_pet, name, residentEmoji)
         mainBtn.describePlain(mainBtn.text)
         // Contrastes ≥ 4,5:1 (étape 8d) : framboise au lieu du rose ; sans la permission, fond clair + texte encre
@@ -383,7 +384,7 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         mainBtn.background = GradientDrawable().apply {
             cornerRadius = 18 * d
             setColor(
-                if (!overlay) Palette.UI_ACTION_OFF else if (running) Palette.UI_ACTION_STOP else Palette.UI_ACTION,
+                if (!overlay) Palette.UI_ACTION_OFF else if (shown) Palette.UI_ACTION_STOP else Palette.UI_ACTION,
             )
         }
     }
@@ -393,8 +394,9 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
             startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
             return
         }
-        if (BunnyService.running) BunnyService.stop(this) else {
-            BunnyService.start(this)
+        if (BunnyService.running && BunnyService.visible) BunnyService.stop(this) else {
+            // Caché (« Ranger » du menu) : le service tourne déjà, on le fait seulement réapparaître
+            if (BunnyService.running) BunnyService.send(this, BunnyService.ACTION_SHOW) else BunnyService.start(this)
             if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 // Ne pas reculer maintenant : la boîte de dialogue partirait en arrière-plan.
                 backgroundAfterPermission = true
