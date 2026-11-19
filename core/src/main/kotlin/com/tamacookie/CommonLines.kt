@@ -4,7 +4,7 @@ package com.tamacookie
  * Répliques partagées par plusieurs fonctionnalités, ou dites par l'hôte en réponse à une commande (adoption,
  * départ d'un compagnon) — indépendantes de l'espèce. Les autres répliques sont dans leur fonctionnalité
  * (`feature/…`, `social/…`), dans le `companion object` de leur contrôleur, ou dans
- * [com.tamacookie.species.SpeciesLines] quand elles nomment l'espèce (voir CLAUDE.md, « Textes »).
+ * [com.tamacookie.species.SpeciesLines] quand elles nomment l'espèce (voir docs/textes-et-accessibilite.md).
  */
 object CommonLines {
     /** Brosse refusée : il dort. */

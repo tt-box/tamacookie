@@ -10,8 +10,8 @@ import javax.xml.parsers.DocumentBuilderFactory
 /**
  * Étape 8c : `res/values/strings.xml` lu comme un fichier XML (pas de ressources Android dans les tests JVM).
  * Le compilateur garantit déjà que chaque `R.string.x` existe ; ici : le personnage « lapin » n'apparaît que dans
- * les textes listés (le personnage de l'app, voir CLAUDE.md « Ce qui reste lapin »), et les formats sont prêts
- * à traduire (arguments numérotés, pluriels complets pour le français).
+ * les textes listés (le personnage de l'app, voir docs/textes-et-accessibilite.md « Ce qui reste lapin »), et les
+ * formats sont prêts à traduire (arguments numérotés, pluriels complets pour le français).
  */
 class StringsResourceTest {
 

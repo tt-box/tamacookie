@@ -9,7 +9,7 @@ import kotlin.random.Random
  * Implémentée par [BunnyService] ; `FakePetCtx` en test.
  *
  * Une fonctionnalité agit sur l'animal qu'on lui passe (ou [pet], l'animal courant) et interroge le
- * monde ; elle n'appelle pas directement un autre contrôleur (sauf exceptions documentées dans CLAUDE.md).
+ * monde ; elle n'appelle pas directement un autre contrôleur (sauf exceptions documentées dans docs/historique.md).
  */
 interface PetCtx {
     // --- Monde ---

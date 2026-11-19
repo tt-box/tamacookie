@@ -9,7 +9,7 @@ import com.tamacookie.species.SpeciesLines
  * Répliques du lapin dites par la boucle et le toucher (bavardage, accueil, voyage, toucher…) :
  * [SpeciesLines] de [Rabbit]. Les répliques des fonctionnalités (stations, jouets, bêtises, pages) sont
  * dans leur fonctionnalité. Kotlin pur ; chaque liste est un tirage possible pour `Speech.pickFrom`.
- * Textes en français, en dur : le cœur ne lit pas les ressources Android (voir CLAUDE.md, « Textes »).
+ * Textes en français, en dur : le cœur ne lit pas les ressources Android (voir docs/textes-et-accessibilite.md).
  */
 object RabbitLines : SpeciesLines {
 

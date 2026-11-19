@@ -4,7 +4,7 @@ package com.tamacookie
  * Caractère de l'animal, choisi à l'adoption (sauvegardé par son nom d'enum : ne pas renommer).
  * [modifiers] : facteurs appliqués par [PetRules] (absent = 1). Le reste de son influence (seuil d'attention
  * des bêtises, durée des parties, vitesse de marche, gourmandise au coffre…) est porté par l'espèce
- * (`Species.behavior` → `BehaviorMods`). Nouveau caractère : **à la fin** (voir CLAUDE.md).
+ * (`Species.behavior` → `BehaviorMods`). Nouveau caractère : **à la fin** (voir docs/recettes.md).
  */
 enum class Personality(val label: String, val emoji: String, val desc: String, val modifiers: Map<StatMod, Float>) {
     PLAYFUL("Joueur", "🎾", "Adore jouer, s'ennuie vite",

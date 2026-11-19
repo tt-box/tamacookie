@@ -3,7 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android") version "2.4.21" apply false
     // Module :core (Kotlin/JVM pur) : même version de Kotlin que l'app.
     id("org.jetbrains.kotlin.jvm") version "2.4.21" apply false
-    // Analyse statique (outil de build seulement) : detekt 2.x, compilé avec Kotlin 2.4 (voir CLAUDE.md, étape 8b).
+    // Analyse statique (outil de build seulement) : detekt 2.x, compilé avec Kotlin 2.4 (voir docs/historique.md, étape 8b).
     id("dev.detekt") version "2.0.0-alpha.6" apply false
 }
 

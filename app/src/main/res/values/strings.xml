@@ -2,11 +2,11 @@
 <!--
   Textes d'interface de l'application (étape 8c). Langue par défaut : le français (tools:locale).
   Noms : <écran>_<rôle> (main_, adopt_, menu_, stations_, chest_, vet_, notif_, widget_, tile_, a11y_).
-  Les répliques de l'animal et les textes du cœur (:core, Kotlin pur) ne sont pas ici : voir CLAUDE.md, « Textes ».
+  Les répliques de l'animal et les textes du cœur (:core, Kotlin pur) ne sont pas ici : voir docs/textes-et-accessibilite.md.
   Une valeur entre guillemets garde ses espaces (doubles espaces après un emoji, espace en tête) ;
   sans guillemets, une apostrophe s'écrit \'.
   « lapin » n'apparaît que là où il désigne le personnage de l'app (l'adoption ne crée que des lapins) :
-  voir CLAUDE.md, « Ce qui reste lapin ».
+  voir docs/textes-et-accessibilite.md, « Ce qui reste lapin ».
 -->
 <resources xmlns:tools="http://schemas.android.com/tools" tools:locale="fr">
     <string name="app_name">TamaCookie</string>
@@ -224,7 +224,7 @@
     <!-- Lu par l'accessibilité : nom, ce que fera un toucher -->
     <string name="tile_description">%1$s : %2$s</string>
     <!-- Lecteur d'écran (étape 8d) : libellés fixes ; les descriptions calculées (animal, jauges, stations,
-         objets) sont dans le cœur (A11yTexts). Voir CLAUDE.md, « Accessibilité ». -->
+         objets) sont dans le cœur (A11yTexts). Voir docs/textes-et-accessibilite.md, « Accessibilité ». -->
     <string name="access_close">Fermer</string>
     <string name="access_action_pet">Caresser</string>
     <string name="access_action_menu">Ouvrir le menu</string>
