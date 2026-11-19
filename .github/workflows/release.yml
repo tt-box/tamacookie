@@ -12,6 +12,12 @@ on:
 # Aucun droit par défaut : chaque job déclare le strict nécessaire.
 permissions: {}
 
+# Deux exécutions pour la même version (tag poussé deux fois, relance manuelle) sont sérialisées, sans jamais annuler
+# celle en cours : interrompue en pleine publication, une release resterait à moitié publiée.
+concurrency:
+  group: release-${{ inputs.version && format('v{0}', inputs.version) || github.ref_name }}
+  cancel-in-progress: false
+
 jobs:
   # Construit, teste, signe et vérifie l'APK — lecture seule sur le dépôt.
   build:
@@ -24,6 +30,28 @@ jobs:
       name: ${{ steps.version.outputs.name }}
       tag: ${{ steps.version.outputs.tag }}
     steps:
+      # Une release n'est jamais signée avec la clé de debug : sans clé, on échoue — et avant toute compilation,
+      # plutôt qu'après plusieurs minutes de build.
+      - name: Vérifier la présence des secrets de signature
+        env:
+          KEYSTORE_BASE64: ${{ secrets.TAMACOOKIE_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.TAMACOOKIE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.TAMACOOKIE_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.TAMACOOKIE_KEY_PASSWORD }}
+          UPLOAD_KEYSTORE_BASE64: ${{ secrets.TAMACOOKIE_UPLOAD_KEYSTORE_BASE64 }}
+          UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.TAMACOOKIE_UPLOAD_KEYSTORE_PASSWORD }}
+          UPLOAD_KEY_ALIAS: ${{ secrets.TAMACOOKIE_UPLOAD_KEY_ALIAS }}
+        run: |
+          missing=""
+          for s in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD \
+                   UPLOAD_KEYSTORE_BASE64 UPLOAD_KEYSTORE_PASSWORD UPLOAD_KEY_ALIAS; do
+            [ -n "${!s}" ] || missing="$missing TAMACOOKIE_$s"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Secrets de signature manquants :$missing"
+            exit 1
+          fi
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
@@ -95,8 +123,8 @@ jobs:
 
       # APK signé avec la clé de release (ECDSA P-256, PKCS12), hors de Gradle : mêmes schémas que la
       # signingConfig de app/build.gradle.kts (v1 inutile en minSdk 36 ; v2, v3, v4). Mots de passe lus
-      # dans l'environnement par apksigner (`env:`), jamais sur la ligne de commande. Une release n'est
-      # jamais signée avec la clé de debug : sans clé, on échoue.
+      # dans l'environnement par apksigner (`env:`), jamais sur la ligne de commande. Présence des secrets
+      # vérifiée en tête du job.
       - name: APK release signé
         env:
           KEYSTORE_BASE64: ${{ secrets.TAMACOOKIE_KEYSTORE_BASE64 }}
@@ -105,14 +133,6 @@ jobs:
           KEY_PASSWORD: ${{ secrets.TAMACOOKIE_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          missing=""
-          for s in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
-            [ -n "${!s}" ] || missing="$missing TAMACOOKIE_$s"
-          done
-          if [ -n "$missing" ]; then
-            echo "::error::Secrets de signature manquants :$missing"
-            exit 1
-          fi
           BUILD_TOOLS="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
           UNSIGNED="$RUNNER_TEMP/unsigned/app-release-unsigned.apk"
           # Signer un APK mal aligné le rendrait inutilisable (alignement 4 octets, 16 Ko pour les .so).
@@ -128,6 +148,9 @@ jobs:
             --v1-signing-enabled false --v2-signing-enabled true \
             --v3-signing-enabled true --v4-signing-enabled true \
             --out "$RUNNER_TEMP/signed/app-release.apk" "$UNSIGNED"
+          # La signature v2+ scelle l'archive : l'alignement doit avoir survécu.
+          "$BUILD_TOOLS/zipalign" -c -P 16 4 "$RUNNER_TEMP/signed/app-release.apk" \
+            || { echo "::error::APK signé mal aligné (zipalign -c)"; exit 1; }
 
       # AAB pour le Play Store : signé avec la CLÉ D'UPLOAD (RSA 4096, alias tamacookie-upload),
       # distincte de la clé des APK — le Play Store refuse une clé d'upload ECDSA. Google re-signe
@@ -139,14 +162,6 @@ jobs:
           UPLOAD_KEY_ALIAS: ${{ secrets.TAMACOOKIE_UPLOAD_KEY_ALIAS }}
         run: |
           set -euo pipefail
-          missing=""
-          for s in UPLOAD_KEYSTORE_BASE64 UPLOAD_KEYSTORE_PASSWORD UPLOAD_KEY_ALIAS; do
-            [ -n "${!s}" ] || missing="$missing TAMACOOKIE_$s"
-          done
-          if [ -n "$missing" ]; then
-            echo "::error::Secrets de la clé d'upload manquants :$missing"
-            exit 1
-          fi
           KS="$RUNNER_TEMP/upload.p12"
           trap 'rm -f "$KS"' EXIT
           echo "$UPLOAD_KEYSTORE_BASE64" | base64 -d > "$KS"
@@ -205,7 +220,9 @@ jobs:
           cp "$RUNNER_TEMP/signed/app-release.apk" "dist/tamacookie-$VERSION_NAME.apk"
           cp "$RUNNER_TEMP/unsigned/app-release-unsigned.apk" "dist/tamacookie-$VERSION_NAME-unsigned.apk"
           cp "$RUNNER_TEMP/signed/app-release.aab" "dist/tamacookie-$VERSION_NAME.aab"
-          (cd dist && sha256sum *.apk *.aab > SHA256SUMS.txt)
+          # mapping.txt de R8 : sans lui, une trace d'exception d'un build minifié est illisible.
+          cp app/build/outputs/mapping/release/mapping.txt "dist/tamacookie-$VERSION_NAME-mapping.txt"
+          (cd dist && sha256sum *.apk *.aab *-mapping.txt > SHA256SUMS.txt)
 
       - name: Artefact release
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -246,4 +263,5 @@ jobs:
           files: |
             dist/*.apk
             dist/*.aab
+            dist/*-mapping.txt
             dist/SHA256SUMS.txt

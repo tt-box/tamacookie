@@ -66,7 +66,11 @@ android {
             enableUnitTestCoverage = true
         }
         release {
-            isMinifyEnabled = false
+            // R8 : code minifié et ressources inutilisées retirées. Le mapping.txt est publié avec chaque
+            // release (release.yml) pour relire les traces d'exception.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             if (hasReleaseKey) {
                 signingConfig = signingConfigs.getByName("release")
             }

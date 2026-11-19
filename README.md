@@ -1,6 +1,7 @@
 # 🐰 TamaCookie
 
 [![CI](https://github.com/tt-box/tamacookie/actions/workflows/ci.yml/badge.svg)](https://github.com/tt-box/tamacookie/actions/workflows/ci.yml)
+[![Scan CVE](https://raw.githubusercontent.com/tt-box/tamacookie/badges/cve.svg)](https://github.com/tt-box/tamacookie/actions/workflows/security.yml)
 [![Couverture des tests](https://raw.githubusercontent.com/tt-box/tamacookie/badges/coverage.svg)](https://github.com/tt-box/tamacookie/actions/workflows/ci.yml)
 [![Release](https://github.com/tt-box/tamacookie/actions/workflows/release.yml/badge.svg)](https://github.com/tt-box/tamacookie/actions/workflows/release.yml)
 [![Dernière version](https://img.shields.io/github/v/release/tt-box/tamacookie?label=version&logo=github)](https://github.com/tt-box/tamacookie/releases/latest)

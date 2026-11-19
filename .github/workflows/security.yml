@@ -1,0 +1,127 @@
+name: Sécurité
+
+# Scan CVE des dépendances, aligné sur gabuzomeu, geoPing et kodifin : à chaque push et PR,
+# plus une exécution hebdomadaire qui attrape les CVE publiées après coup, sans nouveau commit.
+# OSV-Scanner ne lit pas les build.gradle.kts : .github/osv-lock.init.gradle.kts fait écrire par
+# Gradle un gradle.lockfile des classpaths d'exécution (bibliothèques embarquées, transitives
+# comprises) sur le runner, que le scanner confronte à osv.dev.
+# Sans bibliothèque tierce embarquée, le scan porte surtout sur la bibliothèque standard Kotlin.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  osv-scanner:
+    name: CVE (OSV-Scanner)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      count: ${{ steps.count.outputs.count }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+      # Sans cache de configuration : le script d'init et --write-locks changent la configuration.
+      - name: Verrous des classpaths d'exécution (gradle.lockfile)
+        run: ./gradlew --init-script .github/osv-lock.init.gradle.kts :app:dependencies :core:dependencies --write-locks --no-configuration-cache --quiet > /dev/null
+
+      # Le scanner sort en erreur dès qu'il trouve une vulnérabilité : on le laisse finir pour
+      # compter les résultats et publier le badge ; la dernière étape fait échouer le job.
+      - name: OSV-Scanner
+        id: osv
+        continue-on-error: true
+        uses: google/osv-scanner-action/osv-scanner-action@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
+        with:
+          scan-args: |-
+            --format=json
+            --output=osv-results.json
+            --lockfile=app/gradle.lockfile
+            --lockfile=core/gradle.lockfile
+
+      # Nombre de vulnérabilités distinctes : OSV regroupe sous un même « group » les
+      # identifiants alias d'une même faille (CVE, GHSA…), on compte donc les groupes.
+      - name: Compter les vulnérabilités
+        id: count
+        env:
+          OSV_OUTCOME: ${{ steps.osv.outcome }}
+        run: |
+          set -euo pipefail
+          if [ -s osv-results.json ]; then
+            n="$(jq '[.results[]?.packages[]?.groups[]?] | length' osv-results.json)"
+          elif [ "$OSV_OUTCOME" = success ]; then
+            n=0
+          else
+            # Ni rapport ni succès : le scanner a planté. Afficher « 0 » serait mentir.
+            echo "::error::OSV-Scanner a échoué sans produire de rapport"
+            exit 1
+          fi
+          echo "count=$n" >> "$GITHUB_OUTPUT"
+          echo "Vulnérabilités distinctes : $n"
+          if [ "$n" -gt 0 ]; then
+            jq -r '.results[]?.packages[]? | "\(.package.name) \(.package.version) : \([.groups[]?.ids[0]] | join(", "))"' osv-results.json
+          fi
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always() && hashFiles('osv-results.json') != ''
+        with:
+          name: osv-results
+          path: osv-results.json
+          retention-days: 30
+
+      # Une PR vulnérable reste bloquée : le job échoue après le comptage.
+      - name: Échouer si des vulnérabilités sont connues
+        env:
+          COUNT: ${{ steps.count.outputs.count }}
+        run: |
+          if [ "$COUNT" -gt 0 ]; then
+            echo "::error::$COUNT vulnérabilité(s) connue(s) — détail dans l'étape « Compter les vulnérabilités »"
+            exit 1
+          fi
+
+  # Badge « CVE » du README, publié sur la branche `badges` à côté de coverage.svg (main est
+  # protégée : le bot ne peut pas y pousser). Job séparé : le scanner garde un jeton en lecture
+  # seule. Jamais sur une PR ; publié même (surtout) quand le scan a échoué.
+  cve-badge:
+    name: Publication du badge CVE
+    needs: osv-scanner
+    if: always() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && needs.osv-scanner.outputs.count != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    concurrency:
+      group: badges
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Publier cve.svg sur la branche badges
+        env:
+          COUNT: ${{ needs.osv-scanner.outputs.count }}
+        run: |
+          set -euo pipefail
+          bash .github/scripts/cve-badge.sh "$COUNT" "$RUNNER_TEMP/cve.svg"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          bash .github/scripts/publish-badge.sh "$RUNNER_TEMP/cve.svg" cve.svg "Badge CVE : $COUNT ($GITHUB_SHA)"
