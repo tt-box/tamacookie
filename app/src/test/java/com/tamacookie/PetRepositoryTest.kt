@@ -297,6 +297,21 @@ class PetRepositoryTest {
     }
 
     @Test
+    fun `voyage - le resident part, un compagnon prend sa place`() {
+        val pets = FakePrefs()
+        val repo = open(pets, legacyFile())
+        val resident = repo.loadResident()!!
+        val c = repo.adoptCompanion(companion("Praline"))!!
+        assertEquals(c.id, com.tamacookie.travel.TravelRules.depart(repo, resident.id))
+        assertEquals(c.id, repo.residentId())
+        assertEquals(listOf(c.id), repo.ids())
+        assertEquals(c.id.value, pets.getString("resident", null))
+        assertTrue(repo.companions().isEmpty())
+        assertNull(com.tamacookie.travel.TravelRules.depart(repo, c.id))
+        assertNull(repo.residentId())
+    }
+
+    @Test
     fun `compagnon - plafond, et pas sans resident`() {
         assertNull(open(FakePrefs(), FakePrefs()).adoptCompanion(companion("Seul")))
         val repo = open(FakePrefs(), legacyFile())

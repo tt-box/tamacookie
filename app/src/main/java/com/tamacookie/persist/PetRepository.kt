@@ -151,6 +151,11 @@ class PetRepository private constructor(
         e.apply()
     }
 
+    override fun makeResident(id: PetId) {
+        require(id in ids()) { "animal inconnu" }
+        prefs.edit().putString(KEY_RESIDENT, id.value).apply()
+    }
+
     private fun removeKeys(e: SharedPreferences.Editor, id: PetId) {
         val p = prefix(id)
         for (k in prefs.all.keys) if (k.startsWith(p)) e.remove(k)

@@ -52,6 +52,9 @@ interface PetStore {
 
     fun remove(id: PetId)
 
+    /** [id] (déjà enregistré) devient le résident ; l'ancien, s'il existe encore, devient un compagnon. */
+    fun makeResident(id: PetId)
+
     companion object {
         /** Un identifiant valide : pas de séparateur de liste ni de clé. */
         fun isValidId(s: String) = s.isNotEmpty() && s.length <= 64 && s.all { it.isLetterOrDigit() || it == '-' || it == '_' }
