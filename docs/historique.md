@@ -1225,3 +1225,51 @@ Extrait de CLAUDE.md (détail de chaque étape de la feuille de route et des év
   jouets : balle, ballon, pelote n'utilisent que `Mind.kickCooldown` (par animal) et ne sont jamais « tenus » ;
   `groundSaidAt` (ballon) reste commun exprès (une seule réplique « il est par terre ») ; `catchCooldown` commun :
   après un lancer, l'autre attend aussi ≤ 0,9 s avant de pouvoir attraper (gardé). Test : `ToySpecTest` (tunnel à deux).
+- **Voyage NFC + Bluetooth : un animal passe sur un autre téléphone** (transfert définitif ; la visite reste à
+  faire). Choix validés : **tout animal peut partir**, résident compris (le plus ancien compagnon lui succède ;
+  plus personne → service arrêté, l'écran d'adoption revient) ; départ **explicite** par le menu (« 🧳 Voyager »),
+  jamais au simple contact.
+  - **Pourquoi NFC + Bluetooth** : Android Beam n'existe plus (Android 10). L'émetteur **émule une étiquette NFC
+    Forum Type 4** (HCE, `TravelHceService`, AID NDEF `D2760000850101`, catégorie « other ») ; le receveur la lit
+    comme n'importe quelle étiquette et le système ouvre `TravelActivity` (`NDEF_DISCOVERED` sur
+    `application/vnd.com.tamacookie.travel`, + AAR `com.tamacookie`) — l'app n'a pas besoin d'être au premier plan.
+    Le contact ne porte que l'**invitation** (`TravelInvite`, 30 octets : PSM L2CAP, tag de 8 octets, clé AES-128) ;
+    l'animal passe par un **canal L2CAP BLE** (`listenUsingInsecureL2capChannel`, sans appairage) trouvé par
+    l'annonce BLE dont les données de service = le tag.
+  - **Sécurité** : la clé ne circule que par le contact NFC. Tout l'échange est en **AES-GCM** (`TravelChannel`),
+    nonce = sens + compteur (jamais transmis : un message rejoué, réordonné ou renvoyé dans l'autre sens ne se
+    déchiffre pas), type de message authentifié. Un appareil à portée Bluetooth sans la clé est ignoré (l'émetteur
+    continue d'attendre le vrai receveur). Le service HCE ne répond que pendant un envoi (`TravelBeacon`) ; il est
+    préféré (`setPreferredService`) tant que l'écran d'envoi est affiché. Réception : l'intent doit porter
+    `EXTRA_TAG` et la personne **confirme** (« Accueillir ? ») — une app qui forgerait l'intent ne peut pas imposer
+    un animal.
+  - **Deux phases, jamais de perte** (`TravelProtocol`) : `HELLO` (preuve de la clé) → `OFFER` (`PetSnapshot`) →
+    le receveur valide, demande, **enregistre** puis `ACCEPT` (ou `REFUSE` : maison pleine, déjà là, illisible,
+    refusé) → l'émetteur le **retire** (`TravelRules.depart`) puis `GONE`. Lien coupé avant `ACCEPT` : il reste
+    chez l'émetteur. Coupé entre l'enregistrement et la réception d'`ACCEPT` : il existe sur les deux téléphones
+    (même id ; signalé au receveur, « départ non confirmé »). Choix assumé : un double plutôt qu'une perte.
+  - **Écart à « le service est l'autorité »** : le voyage écrit le repository **lui-même** (sur le fil principal,
+    `TravelFlow.onMain`) car l'enregistrement doit être fait avant de répondre au pair ; le service, s'il tourne,
+    est prévenu ensuite (`PetCommands.petArrived` / `petLeft` → `ACTION_PET_ARRIVED` / `ACTION_PET_LEFT`) et met
+    son monde à jour (`BunnyService.petArrived` / `petLeft`, sortie commune `leave` avec `removeCompanion`). Les
+    sauvegardes du service sur un animal parti sont ignorées (`PetRepository.save`). `PetStore.makeResident` ajouté.
+  - **Arrivée** (`TravelRules.arrive`) : compagnon ; ou **résident** si le téléphone n'a encore adopté personne
+    (il remplace l'animal provisoire du premier lancement). Le service est lancé s'il ne tournait pas et que
+    l'affichage par-dessus les apps est autorisé.
+  - Cœur (`travel/`, pur, `TravelTest`) : invitation, message NDEF, étiquette Type 4 (APDU, lecture par morceaux,
+    sélections refusées), protocole sur flux reliés (réussite, chaque refus, mauvaise clé, coupures avant / après
+    acceptation, animal illisible, rejeu / altération / retypage / mauvais sens, taille démesurée, version),
+    arrivée / départ sur un magasin en mémoire ; `PetRepositoryTest` (succession du résident) ; `MenuEntryTest`.
+  - Menu : « Voyager » est la 7e entrée, seule sur la dernière rangée (pleine largeur) — le test « rangées
+    complètes » devient « Voyager seul en bas ». App : `travel/` (`TravelActivity` = cycle de vie + préalables,
+    `TravelSender`, `TravelReceiver`, `TravelFlow` = délais / fin / fil principal, `TravelScreen`,
+    `TravelBluetooth`, `TravelNfc`). Permissions : `NFC`, `BLUETOOTH_ADVERTISE` / `_CONNECT` / `_SCAN`
+    (`neverForLocation`) ; NFC, HCE et BLE déclarés **non requis** (l'app s'installe partout, le voyage explique
+    ce qui manque). Aucune nouvelle dépendance (`javax.crypto` du JDK / d'Android).
+  - **À vérifier sur deux téléphones** (rien de cela n'est testable en JVM) : contact dos à dos, émetteur sur
+    l'écran d'envoi, receveur déverrouillé (n'importe quel écran) → l'écran de réception s'ouvre ; temps de
+    découverte BLE ; « Accueillir » puis l'animal disparaît d'un côté et tombe du ciel de l'autre ; refus (maison
+    pleine, « Non merci ») ; départ du résident (succession) et du dernier animal (adoption) ; service arrêté côté
+    receveur ; autorisation « Appareils à proximité » refusée puis accordée ; Bluetooth / NFC coupés ; app d'un
+    autre éditeur qui revendique aussi l'AID NDEF (choix du système ?) ; deux téléphones tous deux sur l'écran
+    d'envoi (chacun refuse de recevoir).

@@ -21,6 +21,11 @@ object PetCommands {
     /** Un compagnon s'en va (jamais le résident). */
     const val ACTION_REMOVE_PET = "com.tamacookie.REMOVE_PET"
 
+    /** Voyage : un animal est arrivé d'un autre téléphone (déjà enregistré dans le repository). */
+    const val ACTION_PET_ARRIVED = "com.tamacookie.PET_ARRIVED"
+    /** Voyage : un animal est parti sur un autre téléphone (déjà retiré du repository). */
+    const val ACTION_PET_LEFT = "com.tamacookie.PET_LEFT"
+
     const val EXTRA_NAME = "name"
     const val EXTRA_ID = "id"
     private const val EXTRA_NEW = "new"
@@ -59,6 +64,24 @@ object PetCommands {
             Pets.repository(ctx).removeCompanion(id)
         }
     }
+
+    /**
+     * Voyage : le repository a déjà été écrit par le voyage ([com.tamacookie.travel.TravelRules]) — l'échange
+     * Bluetooth exige que ce soit fait **avant** de répondre au pair ; le service, s'il tourne, met son monde à jour.
+     */
+    fun petArrived(ctx: Context, id: PetId) {
+        if (BunnyService.running) ctx.startService(travelIntent(ctx, ACTION_PET_ARRIVED, id))
+        PetWidget.updateAll(ctx)
+    }
+
+    /** Voyage : [id] est parti (voir [petArrived]). */
+    fun petLeft(ctx: Context, id: PetId) {
+        if (BunnyService.running) ctx.startService(travelIntent(ctx, ACTION_PET_LEFT, id))
+        PetWidget.updateAll(ctx)
+    }
+
+    private fun travelIntent(ctx: Context, action: String, id: PetId) =
+        Intent(ctx, BunnyService::class.java).setAction(action).putExtra(EXTRA_ID, id.value)
 
     private fun adoptionIntent(ctx: Context, action: String, a: Adoption): Intent =
         Intent(ctx, BunnyService::class.java).setAction(action)

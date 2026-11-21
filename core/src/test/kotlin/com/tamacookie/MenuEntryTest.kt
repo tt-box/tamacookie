@@ -16,13 +16,15 @@ class MenuEntryTest {
     private class FakeMenuCtx(val base: FakePetCtx = FakePetCtx()) : MenuCtx, PetCtx by base {
         var stationsPanels = 0
         var hideSeeks = 0
+        val travels = ArrayList<PetId>()
         override fun toggleStationsPanel() { stationsPanels++ }
         override fun startHideSeek(): Boolean { hideSeeks++; return true }
+        override fun startTravel(pet: Pet) { travels += pet.id }
     }
 
     /** Tout ce qu'une entrée peut avoir fait, résumé (pour vérifier qu'elle fait quelque chose). */
     private fun effects(c: FakeMenuCtx) = listOf(
-        c.stationsPanels, c.hideSeeks, c.base.hideRequests, c.base.sleepRequests, c.base.said.size,
+        c.stationsPanels, c.hideSeeks, c.travels.size, c.base.hideRequests, c.base.sleepRequests, c.base.said.size,
     )
 
     @Test
@@ -46,6 +48,8 @@ class MenuEntryTest {
         assertEquals(1, ran(MenuEntries.HIDE_SEEK).hideSeeks)
         assertEquals(1, ran(MenuEntries.HIDE).base.hideRequests)
         assertEquals(1, ran(MenuEntries.SLEEP).base.sleepRequests)
+        val t = ran(MenuEntries.TRAVEL)
+        assertEquals(listOf(t.pet.id), t.travels)
     }
 
     @Test
@@ -82,8 +86,13 @@ class MenuEntryTest {
 
     @Test
     fun `nouvelles entrees a la fin - chanter, brosser`() {
-        assertEquals(listOf("Chanter", "Brosser"), MenuEntries.ALL.drop(4).map { it.label })
-        assertEquals(0, MenuEntries.ALL.size % MenuEntries.PER_ROW)          // rangées complètes
+        assertEquals(listOf("Chanter", "Brosser"), MenuEntries.ALL.drop(4).take(2).map { it.label })
+    }
+
+    @Test
+    fun `voyager - seul sur la derniere rangee, en pleine largeur`() {
+        assertEquals(MenuEntries.TRAVEL, MenuEntries.ALL.last())
+        assertEquals(listOf(MenuEntries.TRAVEL), MenuEntries.ALL.chunked(MenuEntries.PER_ROW).last())
     }
 
     @Test

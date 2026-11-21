@@ -90,6 +90,9 @@ en `when` exhaustifs).
   rien à réserver ni libérer.
 - **Rendu** : les vues n'affichent qu'un `PetRenderState` immuable ; `OverlayManager` unique (ids `WindowId`,
   couches `WindowLayer` PET < STATION < PROP < DOCK < BUBBLE < PANEL < MENU) ; couleurs dans `Palette`.
+- **Voyage** (`travel/`) : cœur pur (`TravelInvite`, `NdefTag`, `TravelProtocol`, `TravelRules`) ; l'app arme
+  l'étiquette HCE, ouvre le canal BLE et **écrit le repository avant de répondre au pair**, puis prévient le service
+  (`PetCommands.petArrived` / `petLeft`). Codes `Refusal` et types de message échangés : ne jamais renuméroter.
 - **Ports** : `ScreenSensor` (`ScreenSensorHub`, scan sur `HandlerThread`, `UserSignal` sans perte),
   `ForegroundAppSource`, `ScreenActions` (appui sur « Ignorer l'annonce », liste blanche `ScreenScan.isAdSkip`),
   `PetStore`, `SettingsStore`, `OverlayHost`, `StationPanels`, `Clock`. DI manuelle : `TamaApp` / `AppGraph`.
@@ -110,7 +113,8 @@ Chaque étape : comportement inchangé sauf mention, tests verts, commits sépar
 | 4a–4c | Contenu (stations, jouets, nourritures, bêtises, menu) ; caractères, apparence, saisons ; bien-être, widget, tuile | ✅ |
 | — | Chasseur de pubs ; gamelle autonome ; nourriture jamais refusée / jeu partagé ; CI et release accélérées | ✅ |
 | — | **Prochaine** : évolutions de contenu sur les plugins (recettes dans `docs/recettes.md`) | ⏳ |
-| — | Ensuite : échange Bluetooth (BLE + L2CAP) — visites et transfert (`PetSnapshot`), protocole en deux phases | |
+| — | Voyage : contact NFC (étiquette Type 4 émulée) puis BLE + L2CAP chiffré, transfert en deux phases (`travel/`) | ✅ |
+| — | Ensuite : visites (aller-retour) sur le même transport | |
 
 ## Schéma de persistance v1
 

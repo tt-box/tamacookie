@@ -20,6 +20,8 @@ enum class Refusal(val code: Int) {
     ALREADY_HERE(2),
     /** Animal illisible (autre version, espèce inconnue…). */
     INVALID(3),
+    /** La personne qui tient le téléphone receveur a dit non. */
+    DECLINED(4),
     ;
 
     companion object {
@@ -156,7 +158,8 @@ object TravelProtocol {
         }
 
     /**
-     * Côté receveur. [arrive] : valide **et enregistre durablement** l'animal, ou dit pourquoi il est refusé.
+     * Côté receveur. [arrive] : valide **et enregistre durablement** l'animal, ou dit pourquoi il est refusé (il
+     * peut attendre la réponse de l'utilisateur : l'émetteur attend `ACCEPT` / `REFUSE`).
      */
     fun receive(channel: TravelChannel, arrive: (PetSnapshot) -> Refusal?): Arrival = guard(Arrival::Failed) {
         channel.send(TravelChannel.HELLO, byteArrayOf(TravelChannel.PROTOCOL_VERSION.toByte()))

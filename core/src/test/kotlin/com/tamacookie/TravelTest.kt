@@ -136,6 +136,9 @@ class TravelTest {
         assertArrayEquals(NdefTag.SW_WRONG_P1P2, tag.process(readBinary(200, 2)))
         tag.reset()
         assertArrayEquals(NdefTag.SW_NOT_FOUND, tag.process(readBinary(0, 2)))
+        // Sélection de fichier à l'ancienne (P2 = 00) acceptée
+        tag.process(selectApp)
+        assertArrayEquals(NdefTag.SW_OK, tag.process(apdu(0x00, 0xA4, 0x00, 0x00, 0x02, 0xE1, 0x04)))
     }
 
     @Test

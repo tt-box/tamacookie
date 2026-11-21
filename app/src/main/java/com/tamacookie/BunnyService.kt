@@ -439,6 +439,47 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     private fun removeCompanion(id: PetId) {
         val p = world.pets[id] ?: return
         if (p === resident) return
+        leave(p)
+        repo.remove(id)
+        afterLeave(CommonLines.goodbye(p.name))
+    }
+
+    /**
+     * Un animal arrivé d'un autre téléphone ([PetCommands.ACTION_PET_ARRIVED]) : le voyage l'a déjà enregistré
+     * ([com.tamacookie.travel.TravelRules.arrive]) ; il tombe du ciel. S'il a remplacé l'animal provisoire d'un
+     * téléphone sans adoption, il devient le résident.
+     */
+    private fun petArrived(id: PetId) {
+        if (id in world.pets) return
+        val rec = repo.load(id) ?: return
+        if (repo.residentId() == id) { replaceResident(rec); return }
+        val p = Pet.fromRecord(rec, BunnyPhysics(arena.d), newPetRandom(rec.id))
+        world.add(p)
+        computeBounds()
+        dropIn(p)
+        if (world.isShown(p)) showPet(p)
+        updateNotification(force = true)
+        requestFrames()
+    }
+
+    /**
+     * Un animal est parti sur un autre téléphone ([PetCommands.ACTION_PET_LEFT]) : le voyage l'a déjà retiré du
+     * repository ([com.tamacookie.travel.TravelRules.depart]), qui dit qui est le résident maintenant. Plus personne :
+     * le service s'arrête (l'écran principal proposera une adoption).
+     */
+    private fun petLeft(id: PetId) {
+        val p = world.pets[id] ?: return
+        val heir = repo.residentId()?.let { world.pets[it] }
+        // Le dernier animal est parti : ses sauvegardes d'ici l'arrêt sont ignorées (il n'est plus enregistré)
+        if (heir == null) { stop(this); return }
+        leave(p)
+        world.residentId = heir.id
+        afterLeave(CommonLines.travelGoodbye(p.name))
+    }
+
+    /** [p] quitte l'écran et le monde (jeux, station, menu, bulle, fenêtre, crottes). */
+    private fun leave(p: Pet) {
+        val id = p.id
         if (p.isHiding) mischief.endHiding(p)
         if (world.stationOf(p) != null) stations.leaveStation(p, hopOut = false)
         touch.closeMenuOf(id)
@@ -452,10 +493,13 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         awayPets.remove(id)
         toys.removePoopsOf(id)
         world.remove(id)
-        repo.remove(id)
+    }
+
+    /** Après un départ : un animal qui dormait hors écran prend sa place ; [farewell] (dit par le résident). */
+    private fun afterLeave(farewell: String) {
         // Un compagnon qui dormait hors écran prend la place libérée
         for (q in shown.toList()) if (q.id !in petWindows) { dropIn(q); showPet(q) }
-        say(CommonLines.goodbye(p.name))
+        say(farewell)
         updateNotification(force = true)
         requestFrames()
     }
@@ -506,6 +550,8 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
             PetCommands.ACTION_ADOPT -> PetCommands.adoptionFrom(intent)?.let(::adopt)
             PetCommands.ACTION_ADOPT_COMPANION -> PetCommands.adoptionFrom(intent)?.let(::adoptCompanion)
             PetCommands.ACTION_REMOVE_PET -> intent.getStringExtra(PetCommands.EXTRA_ID)?.let { removeCompanion(PetId(it)) }
+            PetCommands.ACTION_PET_ARRIVED -> intent.getStringExtra(PetCommands.EXTRA_ID)?.let { petArrived(PetId(it)) }
+            PetCommands.ACTION_PET_LEFT -> intent.getStringExtra(PetCommands.EXTRA_ID)?.let { petLeft(PetId(it)) }
         }
         return START_STICKY
     }

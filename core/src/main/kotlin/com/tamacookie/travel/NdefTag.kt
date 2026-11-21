@@ -74,7 +74,7 @@ class NdefTag(ndefMessage: ByteArray, private val onRead: () -> Unit = {}) {
         val data = lc(apdu) ?: return SW_WRONG_LENGTH
         val found = when {
             p1 == BY_NAME -> Sel.APP.takeIf { data.contentEquals(AID) }
-            p1 == BY_ID && p2 == NO_FCI && selected != Sel.NONE -> when {
+            p1 == BY_ID && (p2 == NO_FCI || p2 == FIRST_OR_ONLY) && selected != Sel.NONE -> when {
                 data.contentEquals(CC_ID) -> Sel.CC
                 data.contentEquals(NDEF_ID) -> Sel.NDEF
                 else -> null
@@ -120,6 +120,8 @@ class NdefTag(ndefMessage: ByteArray, private val onRead: () -> Unit = {}) {
         private const val BY_NAME = 0x04
         private const val BY_ID = 0x00
         private const val NO_FCI = 0x0C
+        /** Ancienne forme (mapping Type 4 v1), encore envoyée par certains lecteurs. */
+        private const val FIRST_OR_ONLY = 0x00
         private const val INS_READ_BINARY = 0xB0
         private const val MAX_NDEF = 0x7FFF - 2
         /** Taille maximale lue / écrite par APDU annoncée au lecteur. */

@@ -15,6 +15,8 @@ interface MenuCtx : PetCtx {
     fun toggleStationsPanel()
     /** Cache-cache lancé par l'utilisateur : il explique pourquoi s'il ne peut pas. */
     fun startHideSeek(): Boolean
+    /** Voyage vers un autre téléphone (contact NFC puis Bluetooth) : ouvre l'écran d'envoi de [pet]. */
+    fun startTravel(pet: Pet)
 }
 
 /**
@@ -87,7 +89,10 @@ object MenuEntries {
         ctx.speech.sayOneOf(BRUSHED)
     }
 
-    val ALL: List<MenuEntry> = listOf(SLEEP, STATIONS, HIDE_SEEK, HIDE, SING, BRUSH)
+    /** Voyager : il part sur le téléphone d'un ami (l'écran d'envoi explique le contact NFC). */
+    val TRAVEL = MenuEntry("🧳", "Voyager") { ctx, pet -> ctx.startTravel(pet) }
+
+    val ALL: List<MenuEntry> = listOf(SLEEP, STATIONS, HIDE_SEEK, HIDE, SING, BRUSH, TRAVEL)
 
     /** Boutons par rangée. */
     const val PER_ROW = 2
