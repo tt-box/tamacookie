@@ -128,7 +128,8 @@ open class Panel(context: Context) : LinearLayout(context) {
 
 /**
  * Menu rapide (double-touche / appui long sur le lapin) : un bouton par [MenuEntry] ([MenuEntries.ALL] :
- * dodo, objets, cache-cache, ranger), [MenuEntries.PER_ROW] par rangée.
+ * dodo, objets, cache-cache, ranger…), [MenuEntries.PER_ROW] par rangée (une entrée seule — « Voyager » — prend
+ * toute la largeur).
  * Les soins se font dans les "widgets" flottants : baignoire, véto, cage.
  */
 @SuppressLint("ViewConstructor")

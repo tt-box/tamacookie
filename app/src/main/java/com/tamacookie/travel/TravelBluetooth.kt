@@ -1,0 +1,123 @@
+package com.tamacookie.travel
+
+import android.annotation.SuppressLint
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothServerSocket
+import android.bluetooth.BluetoothSocket
+import android.bluetooth.le.AdvertiseCallback
+import android.bluetooth.le.AdvertiseData
+import android.bluetooth.le.AdvertiseSettings
+import android.bluetooth.le.ScanCallback
+import android.bluetooth.le.ScanFilter
+import android.bluetooth.le.ScanResult
+import android.bluetooth.le.ScanSettings
+import android.os.ParcelUuid
+import java.io.Closeable
+import java.io.IOException
+import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+
+/**
+ * Transport Bluetooth du voyage : **BLE + canal L2CAP orienté connexion** (sans appairage : `insecure`). La
+ * confidentialité et l'authenticité viennent de la clé lue par NFC ([TravelChannel], AES-GCM), pas du lien.
+ *
+ * Les permissions (`BLUETOOTH_ADVERTISE` / `_SCAN` / `_CONNECT`) sont vérifiées par [TravelActivity] **avant** de
+ * créer ces objets, d'où les `@SuppressLint("MissingPermission")`.
+ */
+object TravelBluetooth {
+    /** Service annoncé par l'émetteur ; ses données = [TravelInvite.tag] (8 octets). */
+    val SERVICE: ParcelUuid = ParcelUuid(UUID.fromString("6c1f0b2e-5a4d-4c6e-9f1a-7a6d2b3c4e5f"))
+}
+
+/** Émetteur : canal L2CAP en écoute + annonce BLE portant le tag de l'invitation. */
+@SuppressLint("MissingPermission")
+class TravelHost(private val adapter: BluetoothAdapter) : Closeable {
+    private val server: BluetoothServerSocket = adapter.listenUsingInsecureL2capChannel()
+    private var advertising: AdvertiseCallback? = null
+
+    /** Canal L2CAP attribué par le système (dans l'invitation). */
+    val psm: Int get() = server.psm
+
+    /** Commence l'annonce ; [onFail] (fil principal) si le téléphone la refuse. */
+    fun advertise(tag: ByteArray, onFail: (Int) -> Unit) {
+        val advertiser = adapter.bluetoothLeAdvertiser ?: return onFail(-1)
+        val settings = AdvertiseSettings.Builder()
+            .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
+            .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_MEDIUM)
+            .setConnectable(true)
+            .build()
+        val data = AdvertiseData.Builder()
+            .setIncludeDeviceName(false)
+            .addServiceData(TravelBluetooth.SERVICE, tag)
+            .build()
+        val cb = object : AdvertiseCallback() {
+            override fun onStartFailure(errorCode: Int) = onFail(errorCode)
+        }
+        advertising = cb
+        advertiser.startAdvertising(settings, data, cb)
+    }
+
+    /** Attend un receveur (bloquant ; [close] l'interrompt). */
+    @Throws(IOException::class)
+    fun accept(): BluetoothSocket = server.accept()
+
+    override fun close() {
+        advertising?.let { cb -> runCatching { adapter.bluetoothLeAdvertiser?.stopAdvertising(cb) } }
+        advertising = null
+        runCatching { server.close() }
+    }
+}
+
+/** Receveur : cherche l'annonce qui porte le tag de l'invitation, puis ouvre le canal L2CAP. */
+@SuppressLint("MissingPermission")
+class TravelGuest(private val adapter: BluetoothAdapter) : Closeable {
+    @Volatile private var socket: BluetoothSocket? = null
+    private var scan: ScanCallback? = null
+    private val done = CountDownLatch(1)
+    @Volatile private var found: BluetoothDevice? = null
+
+    /** L'émetteur de [invite], trouvé en moins de [timeoutMs] (bloquant), ou null. */
+    fun find(invite: TravelInvite, timeoutMs: Long): BluetoothDevice? {
+        val scanner = adapter.bluetoothLeScanner ?: return null
+        val filter = ScanFilter.Builder().setServiceData(TravelBluetooth.SERVICE, invite.tag).build()
+        val settings = ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build()
+        val cb = object : ScanCallback() {
+            override fun onScanResult(callbackType: Int, result: ScanResult) {
+                val data = result.scanRecord?.getServiceData(TravelBluetooth.SERVICE)
+                if (data != null && data.contentEquals(invite.tag)) { found = result.device; done.countDown() }
+            }
+
+            override fun onScanFailed(errorCode: Int) = done.countDown()
+        }
+        scan = cb
+        scanner.startScan(listOf(filter), settings, cb)
+        try {
+            done.await(timeoutMs, TimeUnit.MILLISECONDS)
+        } finally {
+            stopScan()
+        }
+        return found
+    }
+
+    /** Ouvre le canal L2CAP vers [device] (bloquant ; [close] l'interrompt). */
+    @Throws(IOException::class)
+    fun connect(device: BluetoothDevice, psm: Int): BluetoothSocket {
+        val s = device.createInsecureL2capChannel(psm)
+        socket = s
+        s.connect()
+        return s
+    }
+
+    private fun stopScan() {
+        scan?.let { cb -> runCatching { adapter.bluetoothLeScanner?.stopScan(cb) } }
+        scan = null
+    }
+
+    override fun close() {
+        done.countDown()
+        stopScan()
+        runCatching { socket?.close() }
+    }
+}

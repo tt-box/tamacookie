@@ -14,4 +14,7 @@ object CommonLines {
 
     /** Un compagnon quitte le téléphone (dit par le résident). */
     fun goodbye(name: String) = "Au revoir $name ! 👋"
+
+    /** Un animal part sur un autre téléphone (voyage, dit par celui qui reste). */
+    fun travelGoodbye(name: String) = "Bon voyage $name ! 🧳"
 }

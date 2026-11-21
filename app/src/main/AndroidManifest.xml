@@ -18,6 +18,17 @@
     <!-- Protection contre le tapjacking : masque les surimpressions des autres apps sur nos écrans -->
     <uses-permission android:name="android.permission.HIDE_OVERLAY_WINDOWS" />
 
+    <!-- Voyage vers un autre téléphone : invitation par contact NFC (émulation d'étiquette), animal en Bluetooth -->
+    <uses-permission android:name="android.permission.NFC" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation" />
+    <uses-feature android:name="android.hardware.nfc" android:required="false" />
+    <uses-feature android:name="android.hardware.nfc.hce" android:required="false" />
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+
     <!-- Pour lire le nom des applications visitées -->
     <queries>
         <intent>
@@ -99,6 +110,32 @@
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
             </intent-filter>
+        </service>
+
+        <!-- Voyage : écran d'envoi (menu de l'animal) et de réception (ouvert par la lecture NFC de l'invitation) -->
+        <activity
+            android:name=".travel.TravelActivity"
+            android:exported="true"
+            android:label="@string/travel_label"
+            android:launchMode="singleTop">
+            <intent-filter>
+                <action android:name="android.nfc.action.NDEF_DISCOVERED" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/vnd.com.tamacookie.travel" />
+            </intent-filter>
+        </activity>
+
+        <!-- Voyage : le téléphone émetteur se présente comme une étiquette NFC (répond seulement pendant l'envoi) -->
+        <service
+            android:name=".travel.TravelHceService"
+            android:exported="true"
+            android:permission="android.permission.BIND_NFC_SERVICE">
+            <intent-filter>
+                <action android:name="android.nfc.cardemulation.action.HOST_APDU_SERVICE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.nfc.cardemulation.host_apdu_service"
+                android:resource="@xml/travel_apdu_service" />
         </service>
 
         <receiver

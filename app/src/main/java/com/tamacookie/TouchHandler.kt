@@ -56,6 +56,11 @@ class TouchHandler(
     private val menuCtx: MenuCtx = object : MenuCtx, PetCtx by ctx {
         override fun toggleStationsPanel() = stations.toggleStationsPanel()
         override fun startHideSeek() = mischief.startHideSeek(fromMenu = true)
+        override fun startTravel(pet: Pet) {
+            // L'écran d'envoi relit l'animal dans le repository : état à jour
+            ctx.save(pet)
+            com.tamacookie.travel.TravelActivity.send(context, pet.id)
+        }
     }
 
     fun refreshMenu() { menu?.refresh() }
