@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  # Une fusion automatique Dependabot (faite avec GITHUB_TOKEN) ne déclenche pas `push` : main est revalidée chaque
+  # semaine quand même (mise à jour d'AGP, de Kotlin ou de detekt fusionnée sans CI sur main).
+  schedule:
+    - cron: "23 5 * * 1"
 
 permissions:
   contents: read

@@ -45,7 +45,8 @@ class AmbientAnimator(private val rnd: Random) {
      */
     fun update(dt: Float, s: PetRenderState, w: Float, h: Float, d: Float): Boolean {
         val active = blink > 0f || earTwitch > 0f || particles.isNotEmpty()
-        t += dt
+        // Ramené dans [0, 2π·100) : sin(3t), sin(2t) inchangés, et la précision reste celle des premières secondes
+        t = (t + dt) % T_PERIOD
         // clignement
         if (blink > 0f) blink -= dt
         else {
@@ -144,3 +145,6 @@ class AmbientAnimator(private val rnd: Random) {
                 (s.pose == Pose.AIR && s.look.ears == Ears.LOP)
     }
 }
+
+/** Période de [AmbientAnimator.t] : multiple de 2π (les balancements en sin(2t) et sin(3t) restent continus). */
+private const val T_PERIOD = (2 * Math.PI * 100).toFloat()

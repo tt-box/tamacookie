@@ -74,9 +74,6 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
         super.onCreate(savedInstanceState)
         // Anti-tapjacking : aucune surimpression d'une autre app par-dessus cet écran
         window.setHideOverlayWindows(true)
-        window.statusBarColor = Palette.UI_BG
-        @Suppress("DEPRECATION")
-        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
 
         // Lecture seule (pas de rattrapage ni d'écriture) : le service ou PetCommands appliqueront le choix
         val repo = Pets.repository(this)

@@ -45,9 +45,9 @@ data class PetSnapshot(
     val look: Look,
     val stats: PetStats,
 ) {
-    /** Ce qu'il devient chez nous (jauges seulement ; le reste est local). */
+    /** Ce qu'il devient chez nous (jauges seulement ; le reste est local). Naissance bornée à [now]. */
     fun toRecord(now: Long): PetRecord = PetRecord(
-        identity = Identity(id, name, bornAt, species),
+        identity = Identity(id, name, bornAt.coerceIn(0L, now), species),
         traits = traits, look = look, stats = stats, adopted = true, lastUpdate = now,
     )
 

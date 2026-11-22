@@ -3,6 +3,7 @@ package com.tamacookie
 import com.tamacookie.persist.Adoption
 import com.tamacookie.persist.Pets
 import com.tamacookie.species.Species
+import com.tamacookie.widget.PetWidget
 import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
@@ -54,8 +55,6 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         super.onCreate(savedInstanceState)
         // Anti-tapjacking : aucune surimpression d'une autre app par-dessus nos réglages
         window.setHideOverlayWindows(true)
-        window.statusBarColor = Palette.UI_BG
-        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -265,6 +264,7 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             setTextColor(Palette.UI_MUTED)
             setPadding((12 * d).toInt(), 0, (12 * d).toInt(), (6 * d).toInt())
+            touchTarget(d, width = false)     // cliquable : cible d'au moins 48 dp
             setOnClickListener {
                 startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
             }
@@ -319,7 +319,8 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         val pet = Pets.repository(this).loadResident()
         previewLook = pet?.look ?: Look()
         residentEmoji = Species.of(pet?.identity?.species).emoji
-        nameEdit.setText(pet?.identity?.name ?: Identity.DEFAULT_NAME)
+        // Pas pendant une saisie : retour d'un réglage (autorisation…) sans perdre le nom tapé
+        if (!nameEdit.hasFocus()) nameEdit.setText(pet?.identity?.name ?: Identity.DEFAULT_NAME)
         preview.contentDescription = A11yTexts.preview(
             nameEdit.text.toString(), Species.of(pet?.identity?.species).label,
             pet?.stats?.mood ?: Mood.OK, pet?.stats?.sleeping == true,
@@ -327,6 +328,8 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         preview.reducedMotion = MotionSettings.reduced(contentResolver)
         refreshPets()
         refresh()
+        // Les boutons du widget dépendent de la permission de surimpression, peut-être accordée entre-temps
+        PetWidget.updateAll(this)
         Choreographer.getInstance().postFrameCallback(this)
     }
 
@@ -483,6 +486,8 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         // Commande : le service applique et sauvegarde (plus de course avec sa sauvegarde périodique)
         PetCommands.rename(this, n)
         refresh()
+        // La liste des animaux montre le nouveau nom (après la commande, asynchrone si le service tourne)
+        petList.postDelayed({ refreshPets() }, 300)
     }
 
     private fun confirmReset() {

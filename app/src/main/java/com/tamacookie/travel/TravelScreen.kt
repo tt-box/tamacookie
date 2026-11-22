@@ -42,19 +42,22 @@ class TravelScreen(private val activity: Activity) {
     private val primary = button()
     private val secondary = button()
 
+    /** Contenu (reçoit les marges des barres système, [com.tamacookie.EdgeToEdge]). */
+    val content: View = LinearLayout(activity).apply {
+        orientation = LinearLayout.VERTICAL
+        gravity = Gravity.CENTER_HORIZONTAL
+        val p = (22 * d).toInt(); setPadding(p, p, p, p)
+        for (v in listOf(emoji, title, message)) addView(v, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        for (b in listOf(primary, secondary)) {
+            val lp = LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = (10 * d).toInt() }
+            addView(b, lp)
+        }
+    }
+
     val root: View = ScrollView(activity).apply {
         setBackgroundColor(Palette.UI_BG)
         isFillViewport = true
-        addView(LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            val p = (22 * d).toInt(); setPadding(p, p, p, p)
-            for (v in listOf(emoji, title, message)) addView(v, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
-            for (b in listOf(primary, secondary)) {
-                val lp = LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = (10 * d).toInt() }
-                addView(b, lp)
-            }
-        })
+        addView(content)
     }
 
     /** Titre et emoji (l'emoji n'est pas lu). */

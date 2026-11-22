@@ -56,7 +56,9 @@ object HideSeekMischief : Mischief {
 
     /** Lance la partie ; depuis le menu, il explique pourquoi c'est impossible. */
     fun startFrom(ctx: MischiefCtx, pet: Pet, fromMenu: Boolean): Boolean {
-        if (ctx.world.stationOf(pet) != null || pet.stats.sleeping || pet.isHiding) return false
+        // En train de manger : pas maintenant (le repas serait perdu)
+        val busy = pet.stats.sleeping || pet.isHiding || pet.act == Act.EAT
+        if (ctx.world.stationOf(pet) != null || busy) return false
         if (!canStart(ctx, pet)) {
             if (fromMenu) ctx.say(if (!ctx.screen.snapshot.connected) NEEDS_ACCESSIBILITY else NEEDS_HOME, 3f)
             return false
@@ -71,7 +73,9 @@ object HideSeekMischief : Mischief {
         ctx.noteInteraction()
         ctx.closeMenu()
         ctx.say(ctx.pick(*START), 2.5f)
-        pet.setAct(Act.HIDE_RUN)
+        // Le jouet qu'il tenait reste là (il ne part pas avec hors de l'écran) ; en plein saut, il court en retombant
+        ctx.world.dropHeldToy(pet.id)
+        pet.setActOrAfterAir(Act.HIDE_RUN)
         return true
     }
 

@@ -48,7 +48,9 @@ class Director(private val world: World) {
         return true
     }
 
-    private fun inMischief(p: Pet) = p.act in MISCHIEF_ACTS || p.mind.mischief.hidingView != null
+    /** Il fait une bêtise, ou saute vers elle (`AIR` puis une activité de bêtise). */
+    private fun inMischief(p: Pet) = p.act in MISCHIEF_ACTS || p.mind.mischief.hidingView != null ||
+        (p.act == Act.AIR && p.body.afterAir in MISCHIEF_ACTS)
 
     // =====================================================================
     //  Coffre, gamelle : un seul animal à la fois
@@ -63,7 +65,9 @@ class Director(private val world: World) {
         val occ = world.station(k)
         for (q in world.pets.values) {
             if (q === p) continue
-            if ((going != null && q.act == going) || occ.has(q.id)) return false
+            // En route, en plein saut pour y aller, ou dedans
+            val heading = going != null && (q.act == going || (q.act == Act.AIR && q.body.afterAir == going))
+            if (heading || occ.has(q.id)) return false
         }
         return true
     }
@@ -257,6 +261,7 @@ class Director(private val world: World) {
             text(p)?.let { out += it }
         }
         lastMood.keys.retainAll(world.pets.keys)
+        lostFood.keys.retainAll(world.pets.keys)
         return if (out.isEmpty()) null else NotifierTexts.joinAlerts(out)
     }
 

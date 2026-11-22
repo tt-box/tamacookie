@@ -537,7 +537,8 @@ class StationController(
             }
             toys.feed(f, from = s, aimed = true)
         } else {
-            val t = if (rnd.nextFloat() < 0.5f) pet.favoriteToy else Toy.values()[rnd.nextInt(Toy.values().size)]
+            val accepted = Toy.entries.filter { pet.species.accepts(it) }.ifEmpty { listOf(pet.favoriteToy) }
+            val t = if (rnd.nextFloat() < 0.5f) pet.favoriteToy else accepted[rnd.nextInt(accepted.size)]
             toys.startPlay(t, from = s, aimed = true)
         }
         ctx.lastInteraction = keep
