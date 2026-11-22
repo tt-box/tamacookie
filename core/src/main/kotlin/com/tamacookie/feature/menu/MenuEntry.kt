@@ -47,7 +47,8 @@ object MenuEntries {
             ctx.on(pet, PetEvent.Woken(grumpy = false))
             pet.express(Expr.SLEEPY, 2f)
             ctx.say(pet.species.lines.GETTING_UP)
-            pet.setActOrAfterAir(Act.IDLE, 3f)
+            // Au lit / en cage : il y reste, la station décide (le lit le fait sortir peu après) ; sinon il se lève
+            if (ctx.world.stationOf(pet) != null) pet.body.actTime = 0f else pet.setActOrAfterAir(Act.IDLE, 3f)
         } else if (st.energy > ctx.rules.notTiredAbove) {
             ctx.speech.sayOneOf(pet.species.lines.NOT_TIRED)
         } else ctx.startSleep(pet)

@@ -172,4 +172,22 @@ class OverlayHostTest {
         table.move(petA, 3, 3)
         assertEquals(2, posts)
     }
+
+    @Test
+    fun `ajout refuse (permission retiree) - signale, fenetre non affichee, pas d'exception`() {
+        val refusing = object : WindowBackend<WindowId> by RecordingBackend() {
+            override fun add(w: WindowId, x: Int, y: Int, fadeIn: Boolean) = throw IllegalStateException("BadToken")
+        }
+        val t = WindowTable(refusing)
+        val failed = ArrayList<WindowId>()
+        t.onAddFailed = { id, _ -> failed += id }
+        t.attach(petA, petA, 10, 20)
+        assertEquals(listOf(petA), failed)
+        assertFalse(t.isAttached(petA))
+        // Sans gestionnaire : l'exception remonte (comportement d'avant)
+        val bare = WindowTable(refusing)
+        var thrown = false
+        try { bare.attach(petA, petA, 10, 20) } catch (_: IllegalStateException) { thrown = true }
+        assertTrue(thrown)
+    }
 }

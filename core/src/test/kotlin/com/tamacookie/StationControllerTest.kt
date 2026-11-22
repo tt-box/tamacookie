@@ -323,6 +323,41 @@ class StationControllerTest {
         assertTrue(sc.touchGoesToPet(s))
     }
 
+    @Test fun `lit - celui qui reste reprend la premiere place, le suivant ne s'assoit pas sur lui`() {
+        val s = install(StationKind.BED)
+        val other = ctx.addPet("seconde")
+        pet.stats = pet.stats.copy(energy = 30f)
+        other.stats = other.stats.copy(energy = 30f)
+        sc.enterStation(StationKind.BED)
+        sc.enterStation(StationKind.BED, p = other)
+        sc.leaveStation(pet, hopOut = false)
+        assertEquals(s.cx + BedStation.seatFor(0).dxDp, other.body.fx, 0.01f)
+        pet.stats = pet.stats.copy(energy = 30f)
+        sc.enterStation(StationKind.BED)
+        assertEquals(s.cx + BedStation.seatFor(1).dxDp, pet.body.fx, 0.01f)
+        assertTrue(pet.body.fx != other.body.fx)
+    }
+
+    @Test fun `on ne range pas une station avec un compagnon dedans`() {
+        install(StationKind.BATH)
+        val other = ctx.addPet("seconde")
+        sc.enterStation(StationKind.BATH, p = other)
+        ctx.said.clear()
+        sc.toggleStation(StationKind.BATH)             // même vue : ranger
+        assertEquals(StationKind.BATH.behavior.occupiedLine, ctx.said.single())
+        assertEquals(here, sc[StationKind.BATH].anchor)
+        assertEquals(StationKind.BATH, ctx.world.stationOf(other))
+    }
+
+    @Test fun `le veto rouvre la fiche d'un compagnon reste dedans`() {
+        install(StationKind.VET)
+        val other = ctx.addPet("seconde")
+        sc.enterStation(StationKind.VET, p = other)
+        panels.vetOpen = false                        // « Ranger » a fermé les panneaux
+        sc.reopenVetPanelIfNeeded()
+        assertTrue(panels.vetOpen)
+    }
+
     @Test fun `les nouvelles stations ont leur place par defaut sur une deuxieme rangee`() {
         val old = sc[StationKind.BATH]
         val bed = sc[StationKind.BED]

@@ -68,6 +68,9 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         /** Commande qui peut **démarrer** le service au premier plan (widget, tuile : voir [userCommand]). */
         private const val EXTRA_FOREGROUND = "foreground"
         private const val TAG = "TamaCookie"
+        /** Passage au premier plan refusé au démarrage : essais supplémentaires, espacés de [FG_RETRY_MS]. */
+        private const val FG_RETRIES = 3
+        private const val FG_RETRY_MS = 400L
         /** Réponse à « Appeler » quand il est déjà là. */
         private const val CALLED = "Je suis là ! 👋"
 
@@ -139,6 +142,11 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     private val awayPets = HashSet<PetId>()
     private val shownBuf = ArrayList<Pet>()
     private val shown: List<Pet> get() = world.shown(shownBuf)
+    /**
+     * Tampon à part pour la reprise de la boucle : elle peut être déclenchée (`requestFrames`) au milieu d'un
+     * parcours de [shown], qui serait vidé sous l'itérateur (`ConcurrentModificationException`).
+     */
+    private val resumeBuf = ArrayList<Pet>()
     /** Animaux de l'image en cours (copie : un animal peut partir pendant l'image). */
     private val framePets = ArrayList<Pet>()
 
@@ -243,6 +251,12 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         watcher = graph.foregroundWatcher()
         wm = getSystemService(WindowManager::class.java)
         overlayManager = OverlayManager(wm)
+        // Permission de surimpression retirée en cours de route : plus aucune fenêtre possible, on s'arrête
+        // proprement (sans toucher au réglage « activé » : il repartira une fois la permission rendue)
+        overlayManager.onAddFailed = { id, e ->
+            Log.w(TAG, "addView $id", e)
+            if (!Settings.canDrawOverlays(this)) stopSelf()
+        }
         graph.clearOverlayArea = { area -> overlayManager.clearArea(area, AD_TAP_CLEAR_MS) }
         windows = OverlayWindows(this, arena, { sharedPrefs }, overlayManager, bubbleAnchor)
         pages = PageTracker(this)
@@ -287,9 +301,9 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
             tryStartForeground()
             removeAllWindows(); stopSelf(); return
         }
-        if (!tryStartForeground()) {
-            removeAllWindows(); stopSelf(); return
-        }
+        // Android 15+ : l'exemption « fenêtre visible » n'est acquise qu'une fois la fenêtre dessinée ; refusé ici
+        // (redémarrage START_STICKY), on réessaie un peu plus tard avant d'abandonner
+        if (!tryStartForeground()) retryForeground(FG_RETRIES)
         running = true
         ready = true
         visible = !hidden
@@ -403,7 +417,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         }
         if (!hidden) attachPet(p)
         // les crottes des compagnons ont été retirées avec le reste : elles reviennent
-        for (c in shown) if (c !== p) world.asPet(c) { toys.restorePoops(c) }
+        for (c in shown.toList()) if (c !== p) world.asPet(c) { toys.restorePoops(c) }
         applyView()
         lastTickWall = clock.wallMs()
         emit(p, PType.SPARKLE, 6)
@@ -502,6 +516,17 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         say(farewell)
         updateNotification(force = true)
         requestFrames()
+    }
+
+    /** Nouvel essai de passage au premier plan dans [FG_RETRY_MS] ; après [left] échecs, le service s'arrête. */
+    private fun retryForeground(left: Int) {
+        handler.postDelayed({
+            when {
+                tryStartForeground() -> Unit
+                left > 1 -> retryForeground(left - 1)
+                else -> { removeAllWindows(); stopSelf() }
+            }
+        }, FG_RETRY_MS)
     }
 
     /** Passe au premier plan ; false si le système le refuse (ex. redémarrage en arrière-plan sur Android 15+). */
@@ -731,6 +756,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         awayPets.clear()
         for (p in shown) attachPet(p)
         toys.reattach()
+        for (p in shown.toList()) world.asPet(p) { toys.restorePoops(p) }
         windows.addDock()
         layoutAnchored()
         applyView()   // gère aussi le lapin en cage sur une autre vue
@@ -884,7 +910,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
 
     private val loop: FrameLoop = FrameLoop(
         frameScheduler, uptimeMs = { clock.uptimeMs() }, targetFps = ::targetFps, canSuspend = ::canSuspend,
-        onError = { what, e -> Log.e(TAG, what, e) }, onResume = { for (p in shown) place(p) },
+        onError = { what, e -> Log.e(TAG, what, e) }, onResume = { for (p in world.shown(resumeBuf)) place(p) },
     ) { dt -> update(dt) }
 
     /**
@@ -942,7 +968,8 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         lastTickWall = now
         for (p in world.pets.values.toList()) world.asPet(p) {
             val newPoops = on(p, PetEvent.Elapsed(hours)).newPoops
-            if (world.isShown(p)) {
+            // Caché : pas de fenêtre ; les crottes en retard reviennent à l'affichage (show → restorePoops)
+            if (world.isShown(p) && !hidden) {
                 repeat(newPoops) {
                     if (toys.poopCount(p.id) < p.stats.poops) {
                         toys.spawnPoop((p.body.fx - p.body.facing * 40 * arena.d).coerceIn(arena.minX, arena.maxX), p)
@@ -1001,6 +1028,12 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
 
     private val appPoll = object : Runnable {
         override fun run() {
+            // Caché, la boucle est arrêtée : jauges, notification et alertes de besoin avancent quand même
+            if (awake && hidden && clock.wallMs() - lastTickWall >= Tuning.STATS_EVERY_MS) {
+                tickStats(force = false)
+                updateNotification(force = false)
+                notifier.checkAlerts()
+            }
             if (awake && !hidden) {
                 try {
                     watcher.poll()?.let { app ->

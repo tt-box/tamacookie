@@ -123,6 +123,12 @@ open class WindowTable<W : Any>(private val backend: WindowBackend<W>) : Overlay
 
     var factory: ((WindowId) -> W?)? = null
 
+    /**
+     * Un ajout de fenêtre refusé (permission de surimpression retirée…) : signalé ici, la fenêtre reste non
+     * affichée. Sans gestionnaire, l'exception remonte à l'appelant.
+     */
+    var onAddFailed: ((WindowId, Exception) -> Unit)? = null
+
     /** Nombre de mises à jour de position envoyées (statistique, tests). */
     var moves = 0L
         private set
@@ -154,7 +160,12 @@ open class WindowTable<W : Any>(private val backend: WindowBackend<W>) : Overlay
     private fun place(id: WindowId, e: Entry<W>, x: Int, y: Int, fadeIn: Boolean) {
         if (e.attached) { move(id, x, y); return }
         e.pending = false
-        backend.add(e.w, x, y, fadeIn)       // peut lever : la fenêtre reste alors non affichée
+        try {
+            backend.add(e.w, x, y, fadeIn)   // peut lever : la fenêtre reste alors non affichée
+        } catch (ex: Exception) {
+            (onAddFailed ?: throw ex).invoke(id, ex)
+            return
+        }
         e.x = x; e.y = y
         e.attached = true
         stack.add(id)                        // le WindowManager l'a mise tout en haut
