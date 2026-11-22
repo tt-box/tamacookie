@@ -211,6 +211,8 @@ object PetRules {
                 poops++
                 newPoops++
             }
+            // Écran plein : au plus une crotte d'avance (sinon tout ce qu'on ramasse reviendrait d'un coup)
+            if (poops >= r.maxPoops) acc = acc.coerceAtMost(1f)
         }
         val wakes = s.sleeping && energy >= r.max
         s = s.copy(

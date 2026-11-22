@@ -300,8 +300,8 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         setContentView(scroll)
         EdgeToEdge.apply(window, scroll, root)
 
-        // Premier lancement : écran d'adoption
-        if (Pets.repository(this).loadResident()?.adopted != true) {
+        // Premier lancement : écran d'adoption (une seule fois : pas à chaque recréation de cet écran)
+        if (savedInstanceState == null && Pets.repository(this).loadResident()?.adopted != true) {
             startActivity(Intent(this, AdoptActivity::class.java).putExtra(AdoptActivity.EXTRA_NEW, true))
         }
     }

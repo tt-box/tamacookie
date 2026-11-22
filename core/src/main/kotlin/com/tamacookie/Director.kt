@@ -195,11 +195,17 @@ class Director(private val world: World) {
         /** Fait vieillir la bulle courante ; renvoie la réplique suivante à afficher (null = rien). */
         fun tick(dt: Float): Line? {
             for (l in queue) l.waited += dt
-            queue.removeAll { it.priority == SpeechPriority.LOW && it.waited > LOW_MAX_WAIT_S }
-            if (current == null) return null
-            remaining -= dt
-            if (remaining > 0f) return null
-            current = null
+            // Une réplique trop vieille n'a plus de sens (« Miam ! » longtemps après le repas) : oubliée
+            queue.removeAll {
+                it.priority == SpeechPriority.LOW && it.waited > LOW_MAX_WAIT_S ||
+                    it.priority == SpeechPriority.NORMAL && it.waited > NORMAL_MAX_WAIT_S
+            }
+            if (current != null) {
+                remaining -= dt
+                if (remaining > 0f) return null
+                current = null
+            }
+            // Pas de bulle (expirée, ou oubliée par forget) : la suivante en attente passe, sans attendre une nouvelle
             val next = queue.maxWithOrNull(compareBy<Line> { it.priority }.thenByDescending { it.waited }) ?: return null
             show(next)
             return next
@@ -214,6 +220,7 @@ class Director(private val world: World) {
         companion object {
             const val MAX_QUEUE = 3
             const val LOW_MAX_WAIT_S = 5f
+            const val NORMAL_MAX_WAIT_S = 15f
         }
     }
 

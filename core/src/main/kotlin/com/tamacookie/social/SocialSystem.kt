@@ -112,8 +112,18 @@ class SocialSystem(val ctx: PetCtx, private val all: List<SocialInteraction> = S
     fun engage(p: Pet, s: SocialInteraction, partner: Pet, duration: Float, leads: Boolean): Engagement {
         val e = Engagement(s, partner.id, duration, leads)
         p.mind.social = e
-        p.body.platform = null
-        p.setActOrAfterAir(Act.SOCIAL)
+        val b = p.body
+        if (b.platform != null && b.act != Act.AIR) {
+            // Perché sur une icône : il en descend (chute, sans tirage) avant l'interaction, au lieu de flotter
+            // puis de se retrouver d'un coup au sol
+            b.platform = null
+            b.phys.stop()
+            b.afterAir = Act.SOCIAL
+            p.setAct(Act.AIR)
+        } else {
+            b.platform = null
+            p.setActOrAfterAir(Act.SOCIAL)
+        }
         return e
     }
 

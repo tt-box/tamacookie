@@ -20,6 +20,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import com.tamacookie.feature.toy.Toy
 import com.tamacookie.persist.Adoption
+import com.tamacookie.persist.PetStore
 import com.tamacookie.persist.Pets
 import com.tamacookie.species.Species
 import kotlin.random.Random
@@ -40,6 +41,15 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
         const val EXTRA_COMPANION = "companion"
         /** Contour d'une pastille de couleur non choisie (non textuel). */
         private val SWATCH_STROKE = 0xFFB9ACA3.toInt()
+        // État sauvegardé (recréation de l'écran)
+        private const val K_FUR = "fur"
+        private const val K_EARS = "ears"
+        private const val K_EYES = "eyes"
+        private const val K_PATTERN = "pattern"
+        private const val K_ACC = "accessory"
+        private const val K_ACC_COLOR = "accColor"
+        private const val K_PERSONALITY = "personality"
+        private const val K_NAME = "name"
     }
 
     /** Noms proposés à un compagnon (`adopt_companion_names`). */
@@ -52,6 +62,7 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
     private var personality = Personality.CUDDLY
     private var isNew = true
     private var asCompanion = false
+    private var validated = false
     private var lastNs = 0L
     private var t = 0f
     private var previewFacing = 1f
@@ -72,13 +83,26 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
         val pet = repo.loadResident()
         val adopted = pet?.adopted == true
         asCompanion = adopted && intent.getBooleanExtra(EXTRA_COMPANION, false)
-        isNew = asCompanion || intent.getBooleanExtra(EXTRA_NEW, !adopted)
+        // Personne n'est encore adopté : c'est toujours une adoption (caractère à choisir), même par « Modifier »
+        isNew = asCompanion || !adopted || intent.getBooleanExtra(EXTRA_NEW, false)
         val taken = (listOfNotNull(pet) + repo.companions()).map { it.identity.name }.toSet()
         if (asCompanion) {
             randomLook(Random(System.nanoTime()))
         } else if (pet != null && (!isNew || adopted)) {
             look = pet.look
             personality = pet.traits.personality
+        }
+        // Recréé (rotation, police, thème) : les choix en cours sont repris
+        savedInstanceState?.let { b ->
+            look = Look(
+                fur = Look.byId(Fur.entries, b.getString(K_FUR), look.fur),
+                ears = Look.byId(Ears.entries, b.getString(K_EARS), look.ears),
+                eyes = Look.byId(EyeColor.entries, b.getString(K_EYES), look.eyes),
+                pattern = Look.byId(Pattern.entries, b.getString(K_PATTERN), look.pattern),
+                accessory = Look.byId(Accessory.entries, b.getString(K_ACC), look.accessory),
+                accColor = Look.byId(AccColor.entries, b.getString(K_ACC_COLOR), look.accColor),
+            )
+            personality = PetStore.enumOr(b.getString(K_PERSONALITY), personality)
         }
         val canAddCompanion = adopted && repo.ids().size < Tuning.MAX_PETS
 
@@ -99,6 +123,7 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
                 isNew -> getString(R.string.adopt_title_new, Species.DEFAULT.emoji)
                 else -> getString(R.string.adopt_title_edit, Species.of(pet?.identity?.species).emoji)
             }
+            describePlain(text)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 26f)
             setTextColor(Palette.INK); paint.isFakeBoldText = true
             gravity = Gravity.CENTER
@@ -113,8 +138,9 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
 
         nameEdit = EditText(this).apply {
             setText(
-                if (asCompanion) companionNames.firstOrNull { it !in taken }.orEmpty()
-                else pet?.identity?.name ?: Identity.DEFAULT_NAME,
+                savedInstanceState?.getString(K_NAME)
+                    ?: if (asCompanion) companionNames.firstOrNull { it !in taken }.orEmpty()
+                    else pet?.identity?.name ?: Identity.DEFAULT_NAME,
             )
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
             setSingleLine()
@@ -164,6 +190,7 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
                 text = getString(
                     R.string.adopt_personality_fixed, personality.emoji, personality.label, personality.desc,
                 )
+                describePlain(text)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
                 setTextColor(Palette.UI_MUTED)
             }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
@@ -195,6 +222,15 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
         setContentView(scroll)
         EdgeToEdge.apply(window, scroll, root)
         refreshAll()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString(K_FUR, look.fur.id); outState.putString(K_EARS, look.ears.id)
+        outState.putString(K_EYES, look.eyes.id); outState.putString(K_PATTERN, look.pattern.id)
+        outState.putString(K_ACC, look.accessory.id); outState.putString(K_ACC_COLOR, look.accColor.id)
+        outState.putString(K_PERSONALITY, personality.name)
+        outState.putString(K_NAME, nameEdit.text.toString())
     }
 
     override fun onResume() {
@@ -248,6 +284,9 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
     }
 
     private fun validate() {
+        // Double toucher : une seule adoption (sinon deux compagnons, ou deux remplacements du résident)
+        if (validated) return
+        validated = true
         val name = Adoption.cleanName(nameEdit.text.toString())
             ?: if (asCompanion) companionNames.random() else Identity.DEFAULT_NAME
         val a = Adoption(
