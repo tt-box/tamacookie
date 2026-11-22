@@ -206,4 +206,21 @@ class AdSkipScanTest {
         assertFalse(relay.pressAdSkip(skipBox))
         assertEquals(1, pressed.size)
     }
+
+    @Test
+    fun `toucher simule - YouTube seulement, rogne a la fenetre active`() {
+        val yt = "com.google.android.youtube"
+        val window = Box(0f, 0f, 1000f, 600f)
+        // Bouton dans sa fenêtre : son centre
+        assertEquals(950f to 500f, ScreenScan.tapPoint(yt, Box(900f, 450f, 1000f, 550f), window))
+        // Une autre application qui refuse le clic : jamais de vrai toucher
+        assertNull(ScreenScan.tapPoint("com.malveillante", Box(900f, 450f, 1000f, 550f), window))
+        assertNull(ScreenScan.tapPoint(null, Box(900f, 450f, 1000f, 550f), window))
+        // Bornes débordant de la fenêtre (vers une autre app en écran partagé) : rognées à la fenêtre
+        assertEquals(950f to 550f, ScreenScan.tapPoint(yt, Box(900f, 500f, 1000f, 1400f), window))
+        // Entièrement hors de sa fenêtre : rien
+        assertNull(ScreenScan.tapPoint(yt, Box(900f, 700f, 1000f, 800f), window))
+        assertNull(ScreenScan.tapPoint(yt, null, window))
+        assertNull(ScreenScan.tapPoint(yt, Box(900f, 450f, 1000f, 550f), null))
+    }
 }

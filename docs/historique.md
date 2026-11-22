@@ -1273,3 +1273,11 @@ Extrait de CLAUDE.md (détail de chaque étape de la feuille de route et des év
     receveur ; autorisation « Appareils à proximité » refusée puis accordée ; Bluetooth / NFC coupés ; app d'un
     autre éditeur qui revendique aussi l'AID NDEF (choix du système ?) ; deux téléphones tous deux sur l'écran
     d'envoi (chacun refuse de recevoir).
+- **Audit (5 relecteurs) — lot 1, sécurité du chasseur de pubs** : quand l'application refusait le clic
+  d'accessibilité, `AdSkipAccess.tap` envoyait un **vrai toucher** au centre des bornes du nœud, bornes fournies par
+  l'application elle-même. Une app malveillante pouvait exposer un faux bouton « Skip ad » refusant le clic, posé
+  sur une autre fenêtre (écran partagé, boîte système), et nous faire appuyer pour elle. Désormais : vrai toucher
+  **seulement dans YouTube** (`ScreenScan.TAP_PKGS`), au centre du bouton **rogné à la fenêtre active**
+  (`ScreenScan.tapPoint`), et l'arbre est **relu une dernière fois** juste avant le geste (même app, bouton toujours
+  là). Le clic d'accessibilité reste permis partout (liste blanche des libellés inchangée). Test : `AdSkipScanTest`.
+  À vérifier sur tablette : une pub YouTube est toujours passée (portrait, paysage, écran partagé).

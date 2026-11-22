@@ -14,8 +14,10 @@ import android.view.accessibility.AccessibilityNodeInfo
  * le scan complet ignore hors du bureau), et l'**appui** demandé par le port [ScreenActions] ([AdSkipRelay]).
  *
  * Tout passe par [ScreenScan.findAdSkip] (liste blanche stricte) ; l'appui **relit** l'arbre sur le fil du scan et
- * n'envoie `ACTION_CLICK` qu'à un nœud de la liste blanche qui recoupe encore la cible ; refusé (YouTube), un toucher
- * simulé au centre de ce nœud ([tap]), jamais ailleurs. Fil principal, sauf [find] (fil du scan, [worker]).
+ * n'envoie `ACTION_CLICK` qu'à un nœud de la liste blanche qui recoupe encore la cible ; refusé, un toucher simulé
+ * ([tap]) **seulement dans YouTube** ([ScreenScan.TAP_PKGS]), au centre du nœud rogné à la fenêtre active, après une
+ * dernière relecture de l'arbre — jamais ailleurs (un faux bouton d'une autre app ne nous fait pas appuyer
+ * pour elle). Fil principal, sauf [find] (fil du scan, [worker]).
  */
 internal class AdSkipAccess(
     private val service: AccessibilityService,
@@ -53,8 +55,11 @@ internal class AdSkipAccess(
         }
     }
 
-    /** Résultat d'une recherche : le nœud trouvé et ses bornes (null = pas de bouton). */
-    private class Found(val node: AccessibilityNodeInfo?, val box: Box?)
+    /** Résultat d'une recherche : le nœud trouvé, ses bornes (null = pas de bouton), l'app et sa fenêtre. */
+    private class Found(val node: AccessibilityNodeInfo?, val box: Box?, val pkg: String, val window: Box) {
+        /** Où toucher pour de vrai si le clic est refusé (null : interdit, voir [ScreenScan.tapPoint]). */
+        val tap: Pair<Float, Float>? get() = ScreenScan.tapPoint(pkg, box, window)
+    }
 
     /**
      * **Fil du scan** : le bouton de pub de la fenêtre active (recoupant [near] s'il est donné). null = rien de
@@ -66,7 +71,7 @@ internal class AdSkipAccess(
         if (pkg == null || ScreenScan.ignoredPkg(pkg, service.packageName)) return null
         val reader = ScreenSensorService.NodeInfoReader()
         val n = ScreenScan.findAdSkip(root, reader, NodeInfoFinder, pkg, near)
-        return Found(n, n?.let { reader.bounds(it) })
+        return Found(n, n?.let { reader.bounds(it) }, pkg, reader.bounds(root))
     }
 
     /**
@@ -81,9 +86,9 @@ internal class AdSkipAccess(
             try {
                 val f = find(target)
                 val clicked = f?.node?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
-                // YouTube refuse le clic d'accessibilité sur ce bouton : vrai toucher simulé en son centre
+                // YouTube refuse le clic d'accessibilité sur ce bouton : vrai toucher simulé (YouTube seulement)
                 val box = f?.box
-                if (!clicked && box != null) main.post { if (!stopped) tap(box) }
+                if (!clicked && box != null && f.tap != null) main.post { if (!stopped) tap(box) }
             } catch (e: Exception) {
                 Log.w("TamaCookie", "ad skip", e)
             }
@@ -93,19 +98,27 @@ internal class AdSkipAccess(
     }
 
     /**
-     * Fil principal : toucher bref au centre de [box] (bornes du nœud **relu** à l'instant, liste blanche). Nos
-     * fenêtres qui recouvrent le bouton (le lapin perché dessus) sont d'abord rendues traversables, sinon le
-     * toucher tomberait sur elles ; le geste part une image plus tard, une fois la mise en page appliquée.
+     * Fil principal : toucher bref sur le bouton [box] (bornes du nœud **relu** à l'instant, liste blanche). Nos
+     * fenêtres qui recouvrent le bouton (l'animal perché dessus) sont d'abord rendues traversables, sinon le
+     * toucher tomberait sur elles. Une mise en page plus tard, l'arbre est **relu une dernière fois** sur le fil du
+     * scan (même app autorisée, bouton toujours là, fenêtre active inchangée) : le geste ne part qu'à ce point.
      */
+    @Suppress("TooGenericExceptionCaught")   // voir run()
     private fun tap(box: Box) {
-        val graph = AppGraph.of(service)
-        graph.clearOverlayArea?.invoke(box)
+        AppGraph.of(service).clearOverlayArea?.invoke(box)
         main.postDelayed({
             if (stopped) return@postDelayed
-            val path = Path().apply { moveTo(box.centerX, box.centerY) }
-            val stroke = GestureDescription.StrokeDescription(path, 0L, TAP_MS)
-            service.dispatchGesture(GestureDescription.Builder().addStroke(stroke).build(), null, null)
+            worker().post {
+                val at = try { find(box)?.tap } catch (e: Exception) { Log.w("TamaCookie", "ad tap", e); null }
+                if (at != null) main.post { if (!stopped) gesture(at) }
+            }
         }, CLEAR_DELAY_MS)
+    }
+
+    private fun gesture(at: Pair<Float, Float>) {
+        val path = Path().apply { moveTo(at.first, at.second) }
+        val stroke = GestureDescription.StrokeDescription(path, 0L, TAP_MS)
+        service.dispatchGesture(GestureDescription.Builder().addStroke(stroke).build(), null, null)
     }
 
     /** Service détruit : plus de recherche ni d'appui. */
