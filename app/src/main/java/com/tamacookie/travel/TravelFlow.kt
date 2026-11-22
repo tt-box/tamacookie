@@ -28,6 +28,8 @@ abstract class TravelFlow(protected val activity: Activity, protected val screen
     /** La fin vient du délai (et non d'une vraie coupure) : message adapté. */
     protected var timedOut = false
     @Volatile protected var socket: BluetoothSocket? = null
+    /** Fermé (écran quitté, annulé, délai) : le fil du voyage ne doit plus rien entreprendre. */
+    @Volatile protected var closed = false
     private var deadline = 0L
 
     /** Autorisations Bluetooth de ce côté. */
@@ -41,6 +43,7 @@ abstract class TravelFlow(protected val activity: Activity, protected val screen
 
     /** Ferme tout ce qui est ouvert (quitter l'écran, délai, fin) ; le fil du voyage s'arrête de lui-même. */
     open fun close() {
+        closed = true
         main.removeCallbacks(tick)
         runCatching { socket?.close() }
     }
@@ -72,12 +75,21 @@ abstract class TravelFlow(protected val activity: Activity, protected val screen
         screen.buttons(R.string.travel_btn_close, activity::finish)
     }
 
-    /** [block] sur le fil principal, depuis le fil du voyage ; une erreur y devient une coupure de lien. */
+    /**
+     * [block] sur le fil principal, depuis le fil du voyage ; une erreur y devient une coupure de lien. Trop long
+     * à venir : la tâche est **annulée** (elle ne s'exécutera pas plus tard, après l'échec annoncé) — sauf si elle a
+     * déjà commencé, auquel cas on attend son résultat.
+     */
     protected fun <T> onMain(block: () -> T): T {
         val task = FutureTask(block)
         main.post(task)
         val failure: Throwable = try {
-            return task.get(MAIN_MS, TimeUnit.MILLISECONDS)
+            return try {
+                task.get(MAIN_MS, TimeUnit.MILLISECONDS)
+            } catch (e: TimeoutException) {
+                if (task.cancel(false)) throw e
+                task.get()
+            }
         } catch (e: ExecutionException) {
             e.cause ?: e
         } catch (e: TimeoutException) {

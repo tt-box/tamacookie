@@ -4,6 +4,7 @@ import com.tamacookie.PetId
 import com.tamacookie.Tuning
 import com.tamacookie.persist.PetSnapshot
 import com.tamacookie.persist.PetStore
+import java.io.IOException
 
 /**
  * Ce que le voyage change dans le magasin des animaux (pur, sur le port [PetStore]).
@@ -26,7 +27,12 @@ object TravelRules {
         }
     }
 
-    /** Installe [snap] chez [store] (horodaté [now]) ou dit pourquoi c'est impossible. */
+    /**
+     * Installe [snap] chez [store] (horodaté [now]) ou dit pourquoi c'est impossible. L'écriture est rendue
+     * **durable** ([PetStore.sync]) avant de rendre la main : l'appelant va confirmer au pair, qui le retirera de
+     * chez lui. Écriture impossible : l'animal est retiré et [IOException] (le pair le garde).
+     */
+    @Throws(IOException::class)
     fun arrive(store: PetStore, snap: PetSnapshot, now: Long): Refusal? {
         refusal(store, snap)?.let { return it }
         val rec = snap.toRecord(now)
@@ -36,16 +42,21 @@ object TravelRules {
         } else {
             store.addCompanion(rec)
         }
+        if (!store.sync()) {
+            store.remove(rec.id)
+            throw IOException("enregistrement impossible")
+        }
         return null
     }
 
-    /** Retire [id] de [store] ; renvoie le résident d'après (null : plus aucun animal ici). */
+    /** Retire [id] de [store] (durablement) ; renvoie le résident d'après (null : plus aucun animal ici). */
     fun depart(store: PetStore, id: PetId): PetId? {
         val wasResident = store.residentId() == id
         store.remove(id)
-        if (!wasResident) return store.residentId()
-        val heir = store.ids().firstOrNull()
-        heir?.let(store::makeResident)
+        val heir = if (wasResident) store.ids().firstOrNull() else store.residentId()
+        if (wasResident) heir?.let(store::makeResident)
+        // Échec d'écriture : au pire il reviendra au prochain lancement (un double, jamais une perte)
+        store.sync()
         return heir
     }
 }

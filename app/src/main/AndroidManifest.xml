@@ -115,6 +115,7 @@
         <!-- Voyage : écran d'envoi (menu de l'animal) et de réception (ouvert par la lecture NFC de l'invitation) -->
         <activity
             android:name=".travel.TravelActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode"
             android:exported="true"
             android:label="@string/travel_label"
             android:launchMode="singleTop">

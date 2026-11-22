@@ -58,24 +58,41 @@ class TravelSender(activity: Activity, screen: TravelScreen, private val id: Pet
         screen.message(activity.getString(R.string.travel_linked))
     }
 
-    /** Sur le fil du voyage : attend le receveur, envoie l'animal. */
+    /**
+     * Sur le fil du voyage : attend le receveur, envoie l'animal. Un appareil qui ne s'authentifie pas (pas passé
+     * par le contact NFC, muet plus de [HELLO_MS], qui coupe ou envoie n'importe quoi) est éconduit et l'on attend
+     * le vrai receveur ; dès qu'un pair s'est authentifié, le voyage se termine quoi qu'il arrive.
+     */
     private fun loop(h: TravelHost, inv: TravelInvite) {
         while (true) {
-            val s = try { h.accept() } catch (_: IOException) { return } // fermé : délai dépassé ou annulé
+            // fermé : délai dépassé ou annulé (accept lève, ou le socket arrive juste après la fermeture)
+            val s = try { h.accept() } catch (_: IOException) { null }
+            if (s == null || closed) { runCatching { s?.close() }; return }
             socket = s
             main.post(::onLinked)
+            val mute = Runnable { runCatching { s.close() } }
+            main.postDelayed(mute, HELLO_MS)
             val result = s.use {
                 TravelProtocol.send(
                     TravelChannel(inv, isSender = true, it.inputStream, it.outputStream),
                     snapshot = { onMain { snapshot() } },
                     depart = { onMain { TravelRules.depart(repo, id); PetCommands.petLeft(activity, id) } },
+                    onHello = { main.removeCallbacks(mute) },
                 )
             }
+            main.removeCallbacks(mute)
             socket = null
-            // Un appareil sans la clé (il n'est pas passé par le contact NFC) : on attend le vrai receveur
-            if (result != Departure.Failed(Failure.AUTH)) { main.post { show(result) }; return }
-            main.post { if (state == State.LINKED) { state = State.ARMED; armFor(ARMED_MS) } }
+            if (result != Departure.Failed(Failure.AUTH) || closed) { main.post { show(result) }; return }
+            main.post(::onUnlinked)
         }
+    }
+
+    /** L'appareil connecté n'était pas le receveur : l'invitation reste présentée. */
+    private fun onUnlinked() {
+        if (state != State.LINKED) return
+        state = State.ARMED
+        armFor(ARMED_MS)
+        screen.message(activity.getString(R.string.travel_send_hint, name))
     }
 
     /** L'animal tel qu'il est maintenant ; parti entre-temps (retiré par l'écran principal) : lien coupé. */
@@ -111,5 +128,7 @@ class TravelSender(activity: Activity, screen: TravelScreen, private val id: Pet
     private companion object {
         /** Invitation présentée au contact NFC (relancé quand elle est lue). */
         const val ARMED_MS = 60_000L
+        /** Un appareil connecté doit s'authentifier (`HELLO`) dans ce délai, sinon il est éconduit. */
+        const val HELLO_MS = 10_000L
     }
 }
