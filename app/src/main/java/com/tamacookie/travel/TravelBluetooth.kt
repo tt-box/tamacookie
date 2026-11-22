@@ -18,6 +18,7 @@ import java.io.IOException
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Transport Bluetooth du voyage : **BLE + canal L2CAP orienté connexion** (sans appairage : `insecure`). La
@@ -70,35 +71,46 @@ class TravelHost(private val adapter: BluetoothAdapter) : Closeable {
     }
 }
 
-/** Receveur : cherche l'annonce qui porte le tag de l'invitation, puis ouvre le canal L2CAP. */
+/**
+ * Receveur : cherche l'annonce qui porte le tag de l'invitation, puis ouvre le canal L2CAP. Un appareil déjà
+ * renvoyé par [find] ne l'est plus (un imitateur écarté, on trouve le suivant).
+ */
 @SuppressLint("MissingPermission")
 class TravelGuest(private val adapter: BluetoothAdapter) : Closeable {
     @Volatile private var socket: BluetoothSocket? = null
-    private var scan: ScanCallback? = null
-    private val done = CountDownLatch(1)
-    @Volatile private var found: BluetoothDevice? = null
+    @Volatile private var scan: ScanCallback? = null
+    @Volatile private var waiting: CountDownLatch? = null
+    @Volatile private var closed = false
+    private val tried = HashSet<String>()
 
-    /** L'émetteur de [invite], trouvé en moins de [timeoutMs] (bloquant), ou null. */
+    /** Un émetteur de [invite] pas encore essayé, trouvé en moins de [timeoutMs] (bloquant), ou null. */
     fun find(invite: TravelInvite, timeoutMs: Long): BluetoothDevice? {
-        val scanner = adapter.bluetoothLeScanner ?: return null
+        val scanner = adapter.bluetoothLeScanner
+        if (closed || scanner == null) return null
+        val latch = CountDownLatch(1)
+        val found = AtomicReference<BluetoothDevice?>()
         val filter = ScanFilter.Builder().setServiceData(TravelBluetooth.SERVICE, invite.tag).build()
         val settings = ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build()
         val cb = object : ScanCallback() {
             override fun onScanResult(callbackType: Int, result: ScanResult) {
-                val data = result.scanRecord?.getServiceData(TravelBluetooth.SERVICE)
-                if (data != null && data.contentEquals(invite.tag)) { found = result.device; done.countDown() }
+                val ours = result.scanRecord?.getServiceData(TravelBluetooth.SERVICE)?.contentEquals(invite.tag) == true
+                val fresh = synchronized(tried) { result.device.address !in tried }
+                if (ours && fresh && found.compareAndSet(null, result.device)) latch.countDown()
             }
 
-            override fun onScanFailed(errorCode: Int) = done.countDown()
+            override fun onScanFailed(errorCode: Int) = latch.countDown()
         }
         scan = cb
+        waiting = latch
         scanner.startScan(listOf(filter), settings, cb)
         try {
-            done.await(timeoutMs, TimeUnit.MILLISECONDS)
+            latch.await(timeoutMs, TimeUnit.MILLISECONDS)
         } finally {
             stopScan()
         }
-        return found
+        val d = found.get() ?: return null
+        synchronized(tried) { tried += d.address }
+        return if (closed) null else d
     }
 
     /** Ouvre le canal L2CAP vers [device] (bloquant ; [close] l'interrompt). */
@@ -106,6 +118,7 @@ class TravelGuest(private val adapter: BluetoothAdapter) : Closeable {
     fun connect(device: BluetoothDevice, psm: Int): BluetoothSocket {
         val s = device.createInsecureL2capChannel(psm)
         socket = s
+        if (closed) s.close()
         s.connect()
         return s
     }
@@ -116,7 +129,8 @@ class TravelGuest(private val adapter: BluetoothAdapter) : Closeable {
     }
 
     override fun close() {
-        done.countDown()
+        closed = true
+        waiting?.countDown()
         stopScan()
         runCatching { socket?.close() }
     }

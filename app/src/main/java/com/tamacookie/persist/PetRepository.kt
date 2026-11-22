@@ -151,6 +151,12 @@ class PetRepository private constructor(
         e.apply()
     }
 
+    /**
+     * Un `commit()` sans modification attend et écrit sur disque l'état en mémoire, écritures différées (`apply`)
+     * comprises : elles deviennent durables avant le retour.
+     */
+    override fun sync(): Boolean = prefs.edit().commit()
+
     override fun makeResident(id: PetId) {
         require(id in ids()) { "animal inconnu" }
         prefs.edit().putString(KEY_RESIDENT, id.value).apply()

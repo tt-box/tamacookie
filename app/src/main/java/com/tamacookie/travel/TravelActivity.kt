@@ -27,7 +27,8 @@ import com.tamacookie.persist.Pets
  *   [TravelReceiver] se connecte, demande à la personne si elle accueille l'animal et l'enregistre.
  *
  * L'écran vérifie d'abord ce qu'il faut (NFC, Bluetooth, autorisation « Appareils à proximité ») et propose le
- * réglage qui manque ; quitter l'écran annule le voyage.
+ * réglage qui manque ; quitter l'écran annule le voyage. Il n'est **pas recréé** par une rotation ou un
+ * redimensionnement (`configChanges` du manifeste) : téléphones inclinés dos à dos, le voyage continue.
  */
 class TravelActivity : Activity() {
 
@@ -95,14 +96,23 @@ class TravelActivity : Activity() {
     override fun onResume() {
         super.onResume()
         // Envoi : notre service répond en priorité au lecteur NFC tant que l'écran est affiché
-        if (flow is TravelSender) emulation?.setPreferredService(this, hceService)
-        // Retour des réglages (NFC, Bluetooth, autorisations)
-        if (checking) check()
+        if (flow is TravelSender) {
+            emulation?.setPreferredService(this, hceService)
+            // Le téléphone ne lit plus d'étiquettes pendant l'envoi : il est l'étiquette, pas le lecteur
+            NfcAdapter.getDefaultAdapter(this)
+                ?.setDiscoveryTechnology(this, NfcAdapter.FLAG_READER_DISABLE, NfcAdapter.FLAG_LISTEN_KEEP)
+        }
+        // Retour des réglages (NFC, Bluetooth, autorisations) : on revérifie sans redemander (seul « Autoriser »
+        // redemande, sinon un refus relancerait la demande en boucle)
+        if (checking) check(askPermissions = false)
     }
 
     override fun onPause() {
         super.onPause()
-        if (flow is TravelSender) emulation?.unsetPreferredService(this)
+        if (flow is TravelSender) {
+            emulation?.unsetPreferredService(this)
+            NfcAdapter.getDefaultAdapter(this)?.resetDiscoveryTechnology(this)
+        }
     }
 
     override fun onDestroy() {

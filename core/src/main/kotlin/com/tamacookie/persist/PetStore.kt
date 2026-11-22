@@ -55,6 +55,12 @@ interface PetStore {
     /** [id] (déjà enregistré) devient le résident ; l'ancien, s'il existe encore, devient un compagnon. */
     fun makeResident(id: PetId)
 
+    /**
+     * Rend **durables** (sur disque) les écritures précédentes, qui sont sinon différées ; false = échec. Le voyage
+     * s'en sert avant de confirmer au pair ([com.tamacookie.travel.TravelRules]).
+     */
+    fun sync(): Boolean = true
+
     companion object {
         /** Un identifiant valide : pas de séparateur de liste ni de clé. */
         fun isValidId(s: String) = s.isNotEmpty() && s.length <= 64 && s.all { it.isLetterOrDigit() || it == '-' || it == '_' }

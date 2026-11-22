@@ -41,25 +41,34 @@ class TravelReceiver(activity: Activity, screen: TravelScreen, private val invit
         thread(name = "voyage-reception") { run(g) }
     }
 
-    /** Sur le fil du voyage : trouver, se connecter, recevoir. */
+    /**
+     * Sur le fil du voyage : trouver, se connecter, recevoir. Un appareil qui annonce le même tag sans avoir la
+     * clé (il l'a recopié de l'annonce) est laissé de côté et l'on cherche le suivant ([MAX_TRIES] au plus).
+     */
     private fun run(g: TravelGuest) {
-        val device = g.find(invite, FIND_MS)
-        if (device == null) {
-            main.post { end(activity.getString(R.string.travel_not_found)) }
-            return
-        }
-        main.post { if (state == State.LINKED) screen.message(activity.getString(R.string.travel_connecting)) }
-        val result = try {
-            g.connect(device, invite.psm).use {
-                socket = it
-                val channel = TravelChannel(invite, isSender = false, it.inputStream, it.outputStream)
-                TravelProtocol.receive(channel, ::decide)
+        var result: Arrival = Arrival.Failed(Failure.AUTH)
+        var tries = 0
+        while (!closed && tries < MAX_TRIES && result == Arrival.Failed(Failure.AUTH)) {
+            val device = g.find(invite, FIND_MS) ?: break
+            tries++
+            main.post { if (state == State.LINKED) screen.message(activity.getString(R.string.travel_connecting)) }
+            result = try {
+                g.connect(device, invite.psm).use {
+                    socket = it
+                    if (closed) return
+                    val channel = TravelChannel(invite, isSender = false, it.inputStream, it.outputStream)
+                    TravelProtocol.receive(channel, ::decide)
+                }
+            } catch (_: IOException) {
+                Arrival.Failed(Failure.AUTH) // connexion refusée : un autre appareil peut-être
             }
-        } catch (_: IOException) {
-            Arrival.Failed(Failure.LINK)
+            socket = null
         }
-        socket = null
-        main.post { show(result) }
+        val r = result
+        main.post {
+            val nobody = r == Arrival.Failed(Failure.AUTH) && !closed
+            if (nobody) end(activity.getString(R.string.travel_not_found)) else show(r)
+        }
     }
 
     /** Sur le fil du voyage : peut-il venir, la personne l'accueille-t-elle, puis enregistrement durable. */
@@ -69,7 +78,8 @@ class TravelReceiver(activity: Activity, screen: TravelScreen, private val invit
         val welcome = blocked == null && ask(snap.name)
         return when {
             blocked != null -> blocked
-            !welcome -> Refusal.DECLINED
+            // Accueilli puis « Annuler » aussitôt : c'est non
+            !welcome || closed -> Refusal.DECLINED
             else -> onMain { TravelRules.arrive(repo, snap, System.currentTimeMillis()) }
         }
     }
@@ -138,8 +148,13 @@ class TravelReceiver(activity: Activity, screen: TravelScreen, private val invit
         private const val FIND_MS = 20_000L
         /** La personne répond « accueillir ? ». */
         private const val ASK_MS = 45_000L
+        /** Appareils essayés au plus (un imitateur, puis le vrai émetteur). */
+        private const val MAX_TRIES = 3
 
-        /** L'invitation lue au contact NFC (le système joint l'étiquette lue), ou null. */
+        /**
+         * L'invitation lue au contact NFC, ou null. L'étiquette jointe (`EXTRA_TAG`) n'est qu'un filtre grossier :
+         * une app peut forger cet intent ; le vrai garde-fou est la question « Accueillir ? ».
+         */
         fun inviteFrom(i: Intent?): TravelInvite? {
             if (i?.action != NfcAdapter.ACTION_NDEF_DISCOVERED) return null
             if (i.getParcelableExtra(NfcAdapter.EXTRA_TAG, Tag::class.java) == null) return null

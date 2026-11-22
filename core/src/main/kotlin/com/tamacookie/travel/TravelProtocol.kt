@@ -48,7 +48,11 @@ sealed interface Arrival {
 enum class Failure {
     /** Lien Bluetooth coupé ou délai dépassé (le socket a été fermé). */
     LINK,
-    /** Message non authentifié : le pair n'a pas la clé de l'invitation, ou message altéré / rejoué. */
+    /**
+     * Le pair ne s'est pas authentifié : il n'a pas la clé de l'invitation, s'est tu, a coupé ou a envoyé n'importe
+     * quoi **avant** le premier message authentifié (un appareil Bluetooth quelconque) — ou message altéré / rejoué.
+     * L'appelant peut attendre / chercher le vrai pair.
+     */
     AUTH,
     /** Message inattendu ou mal formé. */
     PROTOCOL,
@@ -138,11 +142,23 @@ object TravelProtocol {
 
     /**
      * Côté émetteur. [snapshot] : l'animal au moment de l'envoi ; [depart] : le retirer de chez nous (appelé
-     * seulement sur `ACCEPT`, avant de confirmer).
+     * seulement sur `ACCEPT`, avant de confirmer) ; [onHello] : le pair vient de s'authentifier.
+     *
+     * Toute erreur avant un `HELLO` authentifié donne [Failure.AUTH] (l'appelant attend un autre pair) ; après, le
+     * voyage se termine : une même invitation ne sert jamais à deux `OFFER` (nonce GCM jamais réutilisé, même
+     * si un `HELLO` capturé était rejoué sur une nouvelle connexion).
      */
-    fun send(channel: TravelChannel, snapshot: () -> PetSnapshot, depart: () -> Unit): Departure =
+    fun send(
+        channel: TravelChannel,
+        snapshot: () -> PetSnapshot,
+        depart: () -> Unit,
+        onHello: () -> Unit = {},
+    ): Departure =
         guard(Departure::Failed) {
-            val (_, hello) = channel.receive(TravelChannel.HELLO)
+            val hello = try { channel.receive(TravelChannel.HELLO).second } catch (_: IOException) {
+                return@guard Departure.Failed(Failure.AUTH)
+            }
+            onHello()
             if (hello.size != 1 || hello[0].toInt() != TravelChannel.PROTOCOL_VERSION) {
                 return@guard Departure.Failed(Failure.PROTOCOL)
             }
@@ -160,19 +176,33 @@ object TravelProtocol {
     /**
      * Côté receveur. [arrive] : valide **et enregistre durablement** l'animal, ou dit pourquoi il est refusé (il
      * peut attendre la réponse de l'utilisateur : l'émetteur attend `ACCEPT` / `REFUSE`).
+     *
+     * Toute erreur avant un `OFFER` authentifié donne [Failure.AUTH] (l'appelant essaie un autre appareil). Une fois
+     * l'animal enregistré, le résultat est **toujours** [Arrival.Arrived] (non confirmé si `ACCEPT` / `GONE` se
+     * perdent) : il est ici, l'appelant doit le montrer.
      */
     fun receive(channel: TravelChannel, arrive: (PetSnapshot) -> Refusal?): Arrival = guard(Arrival::Failed) {
-        channel.send(TravelChannel.HELLO, byteArrayOf(TravelChannel.PROTOCOL_VERSION.toByte()))
-        val (_, offer) = channel.receive(TravelChannel.OFFER)
+        val offer = try {
+            channel.send(TravelChannel.HELLO, byteArrayOf(TravelChannel.PROTOCOL_VERSION.toByte()))
+            channel.receive(TravelChannel.OFFER).second
+        } catch (_: IOException) {
+            return@guard Arrival.Failed(Failure.AUTH)
+        }
         val snap = (PetSnapshot.fromBytes(offer) as? PetSnapshot.Decoded.Ok)?.snapshot
         val refusal = if (snap == null) Refusal.INVALID else arrive(snap)
         if (snap == null || refusal != null) {
             val r = refusal ?: Refusal.INVALID
-            channel.send(TravelChannel.REFUSE, byteArrayOf(r.code.toByte()))
+            try { channel.send(TravelChannel.REFUSE, byteArrayOf(r.code.toByte())) } catch (_: IOException) { }
             return@guard Arrival.Refused(r)
         }
-        channel.send(TravelChannel.ACCEPT)
-        val confirmed = try { channel.receive(TravelChannel.GONE); true } catch (_: IOException) { false }
+        // Enregistré : quoi qu'il arrive au lien maintenant, il est arrivé
+        val confirmed = try {
+            channel.send(TravelChannel.ACCEPT)
+            channel.receive(TravelChannel.GONE)
+            true
+        } catch (_: IOException) {
+            false
+        }
         Arrival.Arrived(snap, confirmed)
     }
 

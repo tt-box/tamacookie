@@ -190,7 +190,7 @@ class TravelTest {
         var departed = 0
         val (d, a) = both(
             {
-                TravelProtocol.send(link.sender(senderInvite), { snap }) { departed++ }
+                TravelProtocol.send(link.sender(senderInvite), { snap }, depart = { departed++ })
                     .also { link.closeA() }
             },
             { TravelProtocol.receive(link.receiver(receiverInvite), arrive).also { link.closeB() } },
@@ -235,7 +235,7 @@ class TravelTest {
         rx.send(TravelChannel.HELLO, byteArrayOf(TravelChannel.PROTOCOL_VERSION.toByte()))
         var departed = 0
         val f = pool.submit(Callable {
-            TravelProtocol.send(link.sender(), { snap }) { departed++ }
+            TravelProtocol.send(link.sender(), { snap }, depart = { departed++ })
         })
         rx.receive(TravelChannel.OFFER)
         link.close()
@@ -311,11 +311,53 @@ class TravelTest {
     }
 
     @Test
+    fun `avant authentification - toute erreur est AUTH (l'emetteur attend le vrai receveur)`() {
+        // Octet de type inattendu, avant tout HELLO : un appareil quelconque
+        val junk = senderReading(byteArrayOf(9, 0, 0))
+        var hellos = 0
+        assertEquals(Departure.Failed(Failure.AUTH), TravelProtocol.send(junk, { snap }, { }) { hellos++ })
+        // Coupure immédiate
+        assertEquals(Departure.Failed(Failure.AUTH), TravelProtocol.send(senderReading(ByteArray(0)), { snap }, { }))
+        assertEquals(0, hellos)
+        // Receveur : l'appareil coupe avant d'envoyer l'animal → AUTH (on essaiera un autre appareil)
+        val rx = TravelChannel(invite, false, ByteArrayInputStream(ByteArray(0)), NullOut)
+        assertEquals(Arrival.Failed(Failure.AUTH), TravelProtocol.receive(rx) { null })
+    }
+
+    @Test
+    fun `HELLO authentifie signale, puis le voyage se termine meme en cas d'echec`() {
+        val link = Link()
+        var hellos = 0
+        val f = pool.submit(Callable { TravelProtocol.send(link.sender(), { snap }, { }) { hellos++ } })
+        val rx = link.receiver()
+        rx.send(TravelChannel.HELLO, byteArrayOf(TravelChannel.PROTOCOL_VERSION.toByte()))
+        rx.receive(TravelChannel.OFFER)
+        link.closeB()
+        assertEquals(Departure.Failed(Failure.LINK), f.get(5, TimeUnit.SECONDS))   // pas AUTH : on n'attend plus
+        assertEquals(1, hellos)
+        link.close()
+    }
+
+    @Test
+    fun `enregistre puis lien coupe avant ACCEPT - arrive quand meme (non confirme)`() {
+        val link = Link()
+        val tx = link.sender()
+        val f = pool.submit(Callable {
+            // L'émetteur disparaît pendant l'enregistrement : l'envoi d'ACCEPT échouera
+            TravelProtocol.receive(link.receiver()) { link.closeA(); null }
+        })
+        tx.receive(TravelChannel.HELLO)
+        tx.send(TravelChannel.OFFER, snap.toBytes())
+        assertEquals(Arrival.Arrived(snap, confirmed = false), f.get(5, TimeUnit.SECONDS))
+        link.close()
+    }
+
+    @Test
     fun `version de protocole inconnue - l'emetteur abandonne`() {
         val link = Link()
         val rx = link.receiver()
         rx.send(TravelChannel.HELLO, byteArrayOf(99))
-        val d = TravelProtocol.send(link.sender(), { snap }) { }
+        val d = TravelProtocol.send(link.sender(), { snap }, depart = { })
         assertEquals(Departure.Failed(Failure.PROTOCOL), d)
         link.close()
     }
@@ -343,6 +385,9 @@ class TravelTest {
         override fun addCompanion(record: PetRecord) { recs.remove(record.id); recs[record.id] = record }
         override fun remove(id: PetId) { recs.remove(id); if (resident == id) resident = null }
         override fun makeResident(id: PetId) { require(id in recs); resident = id }
+        var syncOk = true
+        var syncs = 0
+        override fun sync(): Boolean { syncs++; return syncOk }
     }
 
     private fun rec(id: String, adopted: Boolean = true) = PetRecord(Identity(PetId(id), name = id), adopted = adopted)
@@ -370,6 +415,19 @@ class TravelTest {
         val empty = MemStore()
         assertNull(TravelRules.arrive(empty, snap, now = 5L))
         assertEquals(snap.id, empty.residentId())
+    }
+
+    @Test
+    fun `arrivee - rendue durable avant de confirmer, sinon il n'est pas garde`() {
+        val s = MemStore().apply { adopt(rec("r"), null) }
+        assertNull(TravelRules.arrive(s, snap, 0L))
+        assertEquals(1, s.syncs)
+        val broken = MemStore().apply { adopt(rec("r"), null); syncOk = false }
+        assertThrows<IOException> { TravelRules.arrive(broken, snap, 0L) }
+        assertEquals(listOf(PetId("r")), broken.ids())
+        // Départ : rendu durable aussi
+        TravelRules.depart(s, snap.id)
+        assertEquals(2, s.syncs)
     }
 
     @Test
