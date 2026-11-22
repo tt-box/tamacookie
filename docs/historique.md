@@ -1305,3 +1305,30 @@ Extrait de CLAUDE.md (détail de chaque étape de la feuille de route et des év
   - Tests : `TravelTest` (erreurs avant authentification, fin après `HELLO`, enregistré puis lien coupé,
     écriture durable / impossible). À vérifier sur deux téléphones : contact NFC avec lecteur coupé, rotation
     pendant l'échange.
+- **Audit — lot 3, stations et coffre** :
+  - **Réveil par le menu dans une station** : `MenuEntries.SLEEP` mettait l'animal en `IDLE` alors qu'il restait
+    compté dans le lit / la cage (`busy`, plus de jeux ni de bêtises, cage sauvegardée). Désormais il reste dans la
+    station, `actTime` remis à zéro : le lit le fait sortir peu après, la cage le garde.
+  - **Panneau 🏠** : `toggleStation` ne regardait que le résident (`has(pet.id)`) ; on pouvait ranger une station
+    avec un **compagnon** dedans (il disparaissait avec elle). Tout occupant compte maintenant.
+  - **Lit à deux places** : à la sortie de l'un, ceux qui restent reprennent la place de leur nouveau rang
+    (`leaveStation`) — l'animal suivant s'asseyait sur celui resté à droite.
+  - **Véto** : après « Ranger » / « Montrer », la fiche revient pour l'occupant du véto (résident ou compagnon) ; un
+    compagnon y restait bloqué sans bouton « Sortir ».
+  - **Coffre** : si l'animal qui l'a percuté part (retiré, voyage) ou n'est plus affiché pendant son vol, l'objet
+    promis est oublié (`dropStalePop`) — le coffre ne réagissait plus et la boucle ne se suspendait plus jamais.
+  - Traces seedées inchangées. Tests : `StationControllerTest` (places du lit, compagnon dans une station rangée,
+    véto d'un compagnon), `MenuEntryTest` (réveil en station).
+- **Audit — lot 4, service** :
+  - **Caché, plus d'alertes** : `checkAlerts` et la notification ne vivaient que dans la boucle, arrêtée quand
+    l'animal est caché. `appPoll` fait maintenant avancer jauges, notification et alertes toutes les 10 s quand il
+    est caché (crottes en retard sans fenêtre, remises à l'affichage par `show` → `restorePoops`).
+  - **Permission de surimpression retirée** : un `addView` refusé remontait jusqu'à `onStartCommand` (plantage).
+    `WindowTable.onAddFailed` (cœur) : la fenêtre reste non affichée ; le service s'arrête (`stopSelf`, réglage
+    « activé » gardé) si la permission manque. Sans gestionnaire, l'exception remonte comme avant (tests).
+  - **Android 15+, redémarrage START_STICKY** : l'exemption « fenêtre visible » n'est acquise qu'après le premier
+    dessin ; un `startForeground` refusé est réessayé 3 fois (400 ms) avant d'abandonner. À vérifier sur appareil.
+  - **`shownBuf` réentrant** : la reprise de la boucle (`requestFrames` au milieu d'un parcours de `shown`)
+    vidait le tampon sous l'itérateur (`ConcurrentModificationException`, plantage possible dans
+    `replaceResident`) ; tampon à part (`resumeBuf`), copie dans `replaceResident`.
+  - Test : `OverlayHostTest` (ajout refusé).
