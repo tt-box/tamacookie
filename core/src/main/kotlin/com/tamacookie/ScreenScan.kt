@@ -175,6 +175,26 @@ object ScreenScan {
         return (byId + byText).firstOrNull { isAdSkip(it, r, f) && (near == null || r.bounds(it).intersects(near)) }
     }
 
+    /**
+     * Applications où l'on peut **toucher pour de vrai** (geste simulé) le bouton de pub quand l'application refuse le
+     * clic d'accessibilité. Ailleurs, jamais : une application pourrait exposer un faux bouton « Skip ad » refusant le
+     * clic, aux bornes posées sur une autre fenêtre (« Autoriser »…), et nous faire appuyer pour elle.
+     */
+    val TAP_PKGS = setOf("com.google.android.youtube")
+
+    /**
+     * Où toucher le bouton [button] de l'application [pkg] dont la fenêtre active occupe [window] : le centre du
+     * bouton **rogné à cette fenêtre**, ou null (application non autorisée, bouton hors de sa fenêtre).
+     */
+    fun tapPoint(pkg: String?, button: Box?, window: Box?): Pair<Float, Float>? {
+        if (pkg !in TAP_PKGS || button == null || window == null) return null
+        val clip = Box(
+            maxOf(button.left, window.left), maxOf(button.top, window.top),
+            minOf(button.right, window.right), minOf(button.bottom, window.bottom),
+        )
+        return if (clip.isEmpty) null else clip.centerX to clip.centerY
+    }
+
     /** Résultat du parcours : plateformes et (page, nombre de pages) du bureau si lue. */
     data class Walk(val platforms: List<Platform>, val page: Pair<Int, Int>?)
 
