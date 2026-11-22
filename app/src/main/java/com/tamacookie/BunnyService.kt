@@ -13,6 +13,7 @@ import android.database.ContentObserver
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.VibratorManager
 import android.provider.Settings
@@ -72,7 +73,6 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         private const val FG_RETRIES = 3
         private const val FG_RETRY_MS = 400L
         /** Réponse à « Appeler » quand il est déjà là. */
-        private const val CALLED = "Je suis là ! 👋"
 
         @Volatile var running = false
             private set
@@ -328,6 +328,12 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
             addAction(Intent.ACTION_SCREEN_OFF); addAction(Intent.ACTION_USER_PRESENT); addAction(Intent.ACTION_SCREEN_ON)
         }, Context.RECEIVER_NOT_EXPORTED)
 
+        // État réel de l'écran au démarrage (ScreenWake suppose « réveillé ») : éteint ou verrouillé, on attend
+        val interactive = getSystemService(PowerManager::class.java)?.isInteractive != false
+        if (!interactive || isLocked()) {
+            screenWake.screenOff()
+            if (interactive && !screenWake.screenOn(locked = true)) handler.postDelayed(unlockPoll, ScreenWake.POLL_MS)
+        }
         startLoop()
         handler.postDelayed(appPoll, 2000)
         handler.postDelayed({
@@ -401,8 +407,11 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         toys.clear()
         windows.forgetBubble(old.id)
         director.bubbles.forget(old.id)
-        val w = petWindows.remove(old.id)
-        if (w != null) overlayManager.release(w.id)
+        val w0 = petWindows.remove(old.id)
+        if (w0 != null) overlayManager.release(w0.id)
+        // Le dessinateur d'espèce est fixé dans la PetView : autre espèce, nouvelle fenêtre
+        val w = w0?.takeIf { old.identity.species == rec.identity.species }
+        if (w0 != null && w == null) { touch.detach(w0.view); viewOwner.remove(w0.view) }
         awayPets.remove(old.id)
         world.remove(old.id)
         repo.adopt(rec, replacing = old.id)
@@ -415,6 +424,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
             petWindows[p.id] = PetWindow(WindowId.Pet(p.id), w.view, w.lp)
             viewOwner[w.view] = p.id
         }
+        if (w == null) ensurePetWindow(p)
         if (!hidden) attachPet(p)
         // les crottes des compagnons ont été retirées avec le reste : elles reviennent
         for (c in shown.toList()) if (c !== p) world.asPet(c) { toys.restorePoops(c) }
@@ -560,7 +570,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         when (intent?.action) {
             ACTION_FEED -> { if (hidden) show(); toys.feed(); requestFrames() }
             ACTION_TOGGLE -> if (hidden) show() else hide()
-            ACTION_SHOW -> if (hidden) show() else if (clock.uptimeMs() - createdAt > 3_000) say(CALLED)
+            ACTION_SHOW -> if (hidden) show() else if (clock.uptimeMs() - createdAt > 3_000) say(CommonLines.CALLED)
             ACTION_STOP -> { stop(this); return START_NOT_STICKY }
             // Réglages changés (niveau de bêtises)
             ACTION_RELOAD -> {

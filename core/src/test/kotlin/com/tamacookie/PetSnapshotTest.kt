@@ -44,10 +44,13 @@ class PetSnapshotTest {
         )
         val s = PetSnapshot.of(rec)
         assertEquals(snap, s)
-        val back = s.toRecord(now = 99L)
+        val now = snap.bornAt + 99L
+        val back = s.toRecord(now)
         assertEquals(snap.stats, back.stats)                      // pas de cage, crottes, sommeil
-        assertEquals(99L, back.lastUpdate)
+        assertEquals(now, back.lastUpdate)
         assertEquals(rec.identity, back.identity)
+        // Né « dans le futur » (horloge d'un pair, valeur forgée) : ramené à maintenant
+        assertEquals(50L, s.copy(bornAt = Long.MAX_VALUE).toRecord(now = 50L).identity.bornAt)
     }
 
     @Test
@@ -121,5 +124,13 @@ class PetSnapshotTest {
     @Test
     fun `champs inconnus ignores - compatibilite avec une version future`() {
         assertEquals(snap, ok(snap.encode() + "wings=2\nsparkles=on\n"))
+    }
+
+    @Test
+    fun `nom saisi a l'adoption - meme nettoyage qu'a l'echange`() {
+        val cut = com.tamacookie.persist.Adoption.cleanName("x".repeat(Identity.MAX_NAME - 1) + "🐰")!!
+        assertTrue(cut.isNotEmpty() && !cut.last().isHighSurrogate())   // emoji jamais coupé en deux
+        assertEquals("Noisette", com.tamacookie.persist.Adoption.cleanName(" Noi‮sette\n "))
+        assertEquals(null, com.tamacookie.persist.Adoption.cleanName("   "))
     }
 }

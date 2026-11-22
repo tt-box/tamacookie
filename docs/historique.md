@@ -1332,3 +1332,35 @@ Extrait de CLAUDE.md (détail de chaque étape de la feuille de route et des év
     vidait le tampon sous l'itérateur (`ConcurrentModificationException`, plantage possible dans
     `replaceResident`) ; tampon à part (`resumeBuf`), copie dans `replaceResident`.
   - Test : `OverlayHostTest` (ajout refusé).
+- **Audit — lot 5, importants restants et mineurs** :
+  - **Crottes** : écran plein, l'accumulateur grossissait sans fin (tout ce qu'on ramassait revenait d'un coup) ;
+    borné à une crotte d'avance (`PetRules`, traces GOLDEN inchangées). **Interaction sociale depuis une icône** :
+    l'animal flottait puis se retrouvait d'un coup au sol ; il en descend d'abord (chute sans tirage, traces
+    inchangées). **Bulles** : après un `forget`, la suivante passe sans attendre une nouvelle demande ; une NORMAL qui
+    attend plus de 15 s est oubliée (« Miam ! » hors contexte).
+  - **Adoption** : double toucher ignoré (deux compagnons) ; choix repris après recréation (rotation, police,
+    thème) ; « Modifier » avant toute adoption laisse choisir le caractère ; emojis du titre et du caractère non
+    épelés. **Écran principal** : l'adoption n'est relancée qu'au premier affichage (pas à chaque recréation) ; le
+    nom tapé n'est plus écrasé au retour d'un réglage ; la liste suit un renommage ; cible ≥ 48 dp pour l'aide
+    d'accessibilité ; le widget est rafraîchi (boutons selon la permission de surimpression). **Widget** : fond
+    opaque — le texte secondaire tombait à ~4,1:1 sur un fond d'écran sombre.
+  - **Petits correctifs** : `Director.mayHeadTo` et `inMischief` comptent l'animal en plein saut vers la gamelle /
+    la bêtise ; `lostFood` purgé des animaux partis ; espèce passée au seuil d'attention ; `AmbientAnimator.t` borné
+    (un Float croissant perdait sa précision après quelques jours d'écran allumé) ; `Adoption.cleanName` = nettoyage
+    de l'échange (emoji jamais coupé, contrôles / sens d'écriture retirés) ; naissance reçue bornée à maintenant ;
+    `CALLED` dans `CommonLines` ; coffre : jouet tiré parmi ceux que l'espèce accepte (mêmes tirages pour le lapin) ;
+    l'objet tenu est lâché pour aller manger et au cache-cache (pas de cache-cache en mangeant ; en plein saut, il
+    part en retombant) ; `ScreenWake` initialisé à l'état réel de l'écran au démarrage ; `replaceResident` ne
+    réutilise la vue que pour la même espèce ; pas d'allocation par dessin (`RabbitRenderer`) ; lignes de barre
+    système inopérantes en API 36 retirées (`EdgeToEdge` ajouté à l'écran de voyage).
+  - **Sauvegarde** : `dataExtractionRules` (ni nuage ni transfert d'appareil à appareil : un animal ne se copie pas,
+    il voyage). **CI** : `ci.yml` aussi chaque lundi (une fusion Dependabot ne déclenche pas `push`). **Baseline
+    lint** vidée : ses trois entrées étaient périmées (`OldTargetApi` de la cible 34, `DataExtractionRules` corrigé,
+    dossier `mipmap-anydpi-v26` vide) ; restent trois avertissements visibles (`ApplySharedPref` voulu dans la
+    migration, compileSdk / targetSdk 37 disponibles).
+  - **Non traités, exprès** : `StationController` → `ToyController` (historique, à passer par un port) ; 🥕 hors
+    de `species/rabbit` (notifications, caractère gourmand : demande un emoji de nourriture par espèce) ;
+    `FollowSocial` tire avec l'aléatoire du meneur (corriger changerait les traces seedées) ; deux
+    `updateViewLayout` possibles pour une bulle dans la même image (exception déjà documentée) ; jauges de l'animal
+    envoyé jusqu'à 60 s en retard (sauvegardées à l'ouverture de l'écran de voyage).
+  - Tests : `PetRulesTest`, `DirectorTest`, `PetSnapshotTest` (nouveaux cas).

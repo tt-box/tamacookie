@@ -290,10 +290,6 @@ class PetBehavior(private val ctx: PetCtx, private val hooks: Hooks) {
     }
 
     /**
-     * Une nourriture est posée : il y court (au repos, en marchant ou assis). Elle n'est à personne : le plus proche
-     * l'emporte (`Director.foodWinner`), et un perdant n'y retourne que s'il est devenu le plus proche.
-     */
-    /**
      * Un jouet est sorti et [p] peut se joindre à la partie : il n'en a pas fini avec ce jouet
      * (`Mind.playedOut`) et n'est pas trop fatigué. Sa partie repart de zéro.
      */
@@ -304,8 +300,13 @@ class PetBehavior(private val ctx: PetCtx, private val hooks: Hooks) {
         return true
     }
 
+    /**
+     * Une nourriture est posée : il y court (au repos, en marchant ou assis). Elle n'est à personne : le plus proche
+     * l'emporte (`Director.foodWinner`), et un perdant n'y retourne que s'il est devenu le plus proche.
+     */
     private fun chasesFood(p: Pet): Boolean {
         if (!ctx.world.hasFood() || ctx.director.foodTarget(p) == null) return false
+        ctx.world.dropHeldToy(p.id)          // il ne mange pas avec le jouet dans la gueule
         p.setAct(Act.GOTO_FOOD)
         return true
     }

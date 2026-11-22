@@ -70,7 +70,7 @@ class MischiefController(private val ctx: PetCtx, private val all: List<Mischief
         if (ctx.world.stationOf(pet) != null) return false
         if (!ctx.director.mayStartMischief(pet)) return false          // un autre animal fait déjà une bêtise
         val now = ctx.clock.wallMs()
-        val thresholdMs = BunnyBrain.attentionThresholdMs(level, pet.personality)
+        val thresholdMs = BunnyBrain.attentionThresholdMs(level, pet.personality, pet.species)
         if (!BunnyBrain.canSeekAttention(now, ctx.lastInteraction, cooldownUntil, thresholdMs)) return false
         if (!pet.mind.brain.rollAttention()) return false
         cooldownUntil = now + BunnyBrain.attentionCooldownMs(level)

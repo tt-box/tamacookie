@@ -12,8 +12,7 @@ import android.nfc.NfcAdapter
 import android.nfc.cardemulation.CardEmulation
 import android.os.Bundle
 import android.provider.Settings
-import android.view.View
-import com.tamacookie.Palette
+import com.tamacookie.EdgeToEdge
 import com.tamacookie.PetId
 import com.tamacookie.R
 import com.tamacookie.persist.Pets
@@ -60,11 +59,9 @@ class TravelActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.setHideOverlayWindows(true)
-        window.statusBarColor = Palette.UI_BG
-        @Suppress("DEPRECATION")
-        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
         screen = TravelScreen(this)
         setContentView(screen.root)
+        EdgeToEdge.apply(window, screen.root, screen.content)
         flow = if (intent?.action == NfcAdapter.ACTION_NDEF_DISCOVERED) receiveFlow() else sendFlow()
         if (flow != null) check()
     }

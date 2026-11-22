@@ -48,7 +48,9 @@ class Director(private val world: World) {
         return true
     }
 
-    private fun inMischief(p: Pet) = p.act in MISCHIEF_ACTS || p.mind.mischief.hidingView != null
+    /** Il fait une bêtise, ou saute vers elle (`AIR` puis une activité de bêtise). */
+    private fun inMischief(p: Pet) = p.act in MISCHIEF_ACTS || p.mind.mischief.hidingView != null ||
+        (p.act == Act.AIR && p.body.afterAir in MISCHIEF_ACTS)
 
     // =====================================================================
     //  Coffre, gamelle : un seul animal à la fois
@@ -63,7 +65,9 @@ class Director(private val world: World) {
         val occ = world.station(k)
         for (q in world.pets.values) {
             if (q === p) continue
-            if ((going != null && q.act == going) || occ.has(q.id)) return false
+            // En route, en plein saut pour y aller, ou dedans
+            val heading = going != null && (q.act == going || (q.act == Act.AIR && q.body.afterAir == going))
+            if (heading || occ.has(q.id)) return false
         }
         return true
     }
@@ -195,11 +199,17 @@ class Director(private val world: World) {
         /** Fait vieillir la bulle courante ; renvoie la réplique suivante à afficher (null = rien). */
         fun tick(dt: Float): Line? {
             for (l in queue) l.waited += dt
-            queue.removeAll { it.priority == SpeechPriority.LOW && it.waited > LOW_MAX_WAIT_S }
-            if (current == null) return null
-            remaining -= dt
-            if (remaining > 0f) return null
-            current = null
+            // Une réplique trop vieille n'a plus de sens (« Miam ! » longtemps après le repas) : oubliée
+            queue.removeAll {
+                it.priority == SpeechPriority.LOW && it.waited > LOW_MAX_WAIT_S ||
+                    it.priority == SpeechPriority.NORMAL && it.waited > NORMAL_MAX_WAIT_S
+            }
+            if (current != null) {
+                remaining -= dt
+                if (remaining > 0f) return null
+                current = null
+            }
+            // Pas de bulle (expirée, ou oubliée par forget) : la suivante en attente passe, sans attendre une nouvelle
             val next = queue.maxWithOrNull(compareBy<Line> { it.priority }.thenByDescending { it.waited }) ?: return null
             show(next)
             return next
@@ -214,6 +224,7 @@ class Director(private val world: World) {
         companion object {
             const val MAX_QUEUE = 3
             const val LOW_MAX_WAIT_S = 5f
+            const val NORMAL_MAX_WAIT_S = 15f
         }
     }
 
@@ -250,6 +261,7 @@ class Director(private val world: World) {
             text(p)?.let { out += it }
         }
         lastMood.keys.retainAll(world.pets.keys)
+        lostFood.keys.retainAll(world.pets.keys)
         return if (out.isEmpty()) null else NotifierTexts.joinAlerts(out)
     }
 

@@ -35,7 +35,11 @@ data class Adoption(
         }
 
     companion object {
-        /** Nom saisi : espaces retirés, tronqué, null s'il est vide. */
-        fun cleanName(raw: String?): String? = raw?.trim()?.take(Identity.MAX_NAME)?.ifEmpty { null }
+        /**
+         * Nom saisi : nettoyé comme un nom reçu d'un autre téléphone ([PetSnapshot.cleanName] : contrôles, sens
+         * d'écriture, espaces, troncature sans couper un emoji), null s'il est vide.
+         */
+        fun cleanName(raw: String?): String? =
+            if (raw.isNullOrBlank()) null else PetSnapshot.cleanName(raw).takeIf { it.isNotBlank() }
     }
 }

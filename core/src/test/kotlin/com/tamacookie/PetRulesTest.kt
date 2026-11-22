@@ -214,6 +214,18 @@ class PetRulesTest {
         assertEquals(GOLDEN, TRACE_PERSONALITIES.joinToString("\n") { trace(it) })
     }
 
+    @Test
+    fun `ecran plein de crottes - au plus une d'avance, ramasser ne les fait pas toutes revenir`() {
+        val full = PetStats(satiety = 100f, poops = 5)
+        val later = on(full, Elapsed(24f)).stats
+        assertEquals(5, later.poops)
+        assertTrue(later.poopAccumulator <= 1f)
+        var cleaned = later
+        repeat(5) { cleaned = on(cleaned, PoopRemoved).stats }
+        assertEquals(0, cleaned.poops)
+        assertTrue(on(cleaned, Elapsed(0.01f)).stats.poops <= 1)
+    }
+
     internal fun trace(p: Personality): String {
         val rnd = Random(p.ordinal + 7)
         val traits = Traits(p, Toy.FRISBEE)

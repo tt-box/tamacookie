@@ -391,9 +391,8 @@ class RabbitRenderer(private val d: Float) : PetRenderer {
 
     /** Printemps : trois fleurs dans l'herbe, à ses pieds. */
     private fun groundFlowers(c: Canvas) {
-        val spots = floatArrayOf(-44f, 0f, 36f, 2f, -30f, 3f)
         for (i in 0 until 3) {
-            val x = spots[i * 2]; val y = spots[i * 2 + 1]
+            val x = FLOWER_SPOTS[i * 2]; val y = FLOWER_SPOTS[i * 2 + 1]
             seasonPaint.color = Palette.LEAF
             rect.set(x - 0.9f, y - 9f, x + 0.9f, y); c.drawRect(rect, seasonPaint)
             seasonPaint.color = if (i == 1) Palette.SPRING_FLOWER_2 else Palette.SPRING_FLOWER
@@ -601,3 +600,6 @@ class RabbitRenderer(private val d: Float) : PetRenderer {
         return abs(x - cx) < 38f * s && y > fy - 100f * s && y < fy + 6f * s
     }
 }
+
+/** Fleurs au sol (printemps) : (x, y) en dp autour des pattes — constant, pas alloué à chaque dessin. */
+private val FLOWER_SPOTS = floatArrayOf(-44f, 0f, 36f, 2f, -30f, 3f)

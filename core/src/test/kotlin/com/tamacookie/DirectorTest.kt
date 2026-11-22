@@ -242,6 +242,19 @@ class DirectorTest {
         assertFalse(q.waiting.any { it.pet == PetId("y") })
     }
 
+    @Test fun bulles_apresOubli_laSuivantePasseSansAttendre_etLesVieillesSontOubliees() {
+        val q = BubbleQueue()
+        q.request(line("a", "a", s = 30f, pr = SpeechPriority.HIGH))
+        assertFalse(q.request(line("b", "miam")))
+        q.forget(PetId("a"))                                     // la bulle de a disparaît (fenêtre retirée)
+        assertEquals("miam", q.tick(0.1f)!!.text)                // b parle tout de suite
+        // Une NORMAL qui attend trop longtemps est oubliée
+        q.request(line("c", "c", s = 60f, pr = SpeechPriority.HIGH))
+        assertFalse(q.request(line("d", "trop tard")))
+        q.tick(BubbleQueue.NORMAL_MAX_WAIT_S + 0.5f)
+        assertTrue(q.waiting.isEmpty())
+    }
+
     // --- Notifications ---
     @Test fun notifications_seul_commeAvant() {
         assertEquals("${a.name} se promène", dir.title { "se promène" })
