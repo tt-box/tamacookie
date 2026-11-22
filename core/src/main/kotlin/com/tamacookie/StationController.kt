@@ -320,6 +320,8 @@ class StationController(
         val k = ctx.world.stationOf(p) ?: return
         ctx.world.station(k).leave(p.id)
         setOccupied(get(k))
+        // Ceux qui restent reprennent la place de leur nouveau rang (sinon le suivant s'assoirait sur eux)
+        for (id in ctx.world.station(k).occupants) ctx.world.pets[id]?.let { positionInStation(it, k) }
         k.behavior.onLeave(sctx, p)
         ctx.layoutAnchored()
         if (hopOut) ctx.actor.jumpTo(p, (p.body.fx + (if (p.body.fx < arena.screenW / 2) 90 else -90) * d).coerceIn(arena.minX, arena.maxX), arena.groundY, Act.IDLE)
@@ -349,20 +351,23 @@ class StationController(
         )
     }
 
-    /** Panneau 🏠 : installe [k] sur la vue courante, ou la range (sauf si l'animal ne peut pas en sortir). */
+    /**
+     * Panneau 🏠 : installe [k] sur la vue courante, ou la range — pas si **un animal** (résident ou compagnon) est
+     * dedans : on ne range pas une station avec quelqu'un à l'intérieur.
+     */
     fun toggleStation(k: StationKind) {
         val pages = ctx.pages
         val s = get(k)
         val b = k.behavior
-        val inside = ctx.world.station(k).has(pet.id)
+        val occupant = ctx.world.station(k).occupants.firstNotNullOfOrNull { ctx.world.pets[it] }
         if (s.anchor == pages.currentView) {
-            if (inside) ctx.say(b.occupiedLine)
+            if (occupant != null) ctx.say(b.occupiedLine)
             else { s.anchor = null; saveAnchor(s) }
         } else {
-            if (inside && b.holdsPet) {
+            if (occupant != null && b.holdsPet) {
                 ctx.say(b.stayLine)
             } else {
-                if (inside) leaveStation(pet, hopOut = false)
+                occupant?.let { leaveStation(it, hopOut = false) }
                 s.anchor = pages.currentView; saveAnchor(s)
             }
         }
@@ -472,6 +477,7 @@ class StationController(
         val pet = pet
         val act = pet.body.act
         // L'objet sort une fois le lapin retombé (pas en plein vol) ; pendant ce temps, pas d'autre choc
+        dropStalePop()
         val pop = chestPop
         if (pop != null) {
             if (chestPopFor != pet.id) return
@@ -501,6 +507,15 @@ class StationController(
             chestPopFor = pet.id
             ctx.say(ctx.pick(*ChestStation.BUMPED_OPEN), 2f)
         }
+    }
+
+    /**
+     * Celui qui a percuté le coffre est parti (retiré, voyage) ou n'est plus affiché : l'objet ne sortira pas (sinon
+     * le coffre ne réagirait plus et la boucle ne se suspendrait plus jamais).
+     */
+    private fun dropStalePop() {
+        val popper = chestPopFor?.let { ctx.world.pets[it] }
+        if (chestPop != null && (popper == null || !ctx.world.isShown(popper))) { chestPop = null; chestPopFor = null }
     }
 
     /** Sort de quoi manger (s'il a faim) ou un jouet du coffre. */
@@ -547,9 +562,13 @@ class StationController(
 
     private fun closeVetPanel() = panels.closeVet()
 
-    /** Après "Montrer" : s'il est toujours chez le véto, le panneau revient (sinon il y resterait bloqué). */
+    /**
+     * Après "Montrer" : si un animal (résident ou compagnon) est toujours chez le véto, sa fiche revient (sinon il y
+     * resterait bloqué, sans bouton « Sortir »).
+     */
     fun reopenVetPanelIfNeeded() {
-        if (ctx.world.stationOf(pet) == StationKind.VET && !panels.vetOpen) openVetPanel(pet)
+        if (panels.vetOpen) return
+        ctx.world.station(StationKind.VET).occupants.firstNotNullOfOrNull { ctx.world.pets[it] }?.let(::openVetPanel)
     }
 
     /** Nouvelle taille d'écran : les panneaux ouverts sont replacés dans l'écran. */

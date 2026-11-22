@@ -53,6 +53,19 @@ class MenuEntryTest {
     }
 
     @Test
+    fun `reveil par le menu dans une station - il y reste, la station decide`() {
+        val c = FakeMenuCtx()
+        c.pet.stats = c.pet.stats.copy(sleeping = true)
+        c.base.world.station(com.tamacookie.feature.station.StationKind.BED).enter(c.pet.id)
+        c.pet.setAct(Act.IN_STATION)
+        c.pet.body.actTime = 50f
+        MenuEntries.SLEEP.run(c, c.pet)
+        assertFalse(c.pet.stats.sleeping)
+        assertEquals(Act.IN_STATION, c.pet.act)
+        assertEquals(0f, c.pet.body.actTime)
+    }
+
+    @Test
     fun `dodo - pas fatigue, il refuse`() {
         val c = FakeMenuCtx()
         c.pet.stats = c.pet.stats.copy(energy = 95f)
