@@ -1281,3 +1281,27 @@ Extrait de CLAUDE.md (détail de chaque étape de la feuille de route et des év
   (`ScreenScan.tapPoint`), et l'arbre est **relu une dernière fois** juste avant le geste (même app, bouton toujours
   là). Le clic d'accessibilité reste permis partout (liste blanche des libellés inchangée). Test : `AdSkipScanTest`.
   À vérifier sur tablette : une pub YouTube est toujours passée (portrait, paysage, écran partagé).
+- **Audit — lot 2, robustesse du voyage** (la promesse « jamais de perte » n'était pas tenue de bout en bout) :
+  - **Écriture durable** : `adopt` / `addCompanion` / `remove` écrivent en différé (`apply`) ; `ACCEPT` partait
+    avant l'écriture sur disque. `PetStore.sync()` (repository : `commit()` sans modification, qui écrit aussi les
+    écritures différées) est appelé par `TravelRules.arrive` **avant** de rendre la main ; échec → l'animal est
+    retiré et `IOException` (l'émetteur le garde). `depart` aussi.
+  - **Animal enregistré = arrivé** : une erreur après l'enregistrement (envoi d'`ACCEPT`, `GONE` perdu) donne
+    toujours `Arrival.Arrived(confirmed = false)` — il est montré (`petArrived`) et le double éventuel est signalé ;
+    avant, l'écran disait « échec » et le service n'était pas prévenu.
+  - **`onMain` annule** une tâche pas encore commencée au bout de 5 s (elle ne s'exécute plus après l'échec
+    annoncé). **Annulation** : `TravelFlow.closed` ; un socket rendu par `accept` / créé par `connect` après la
+    fermeture est refermé ; « Accueillir » puis « Annuler » aussitôt → refusé.
+  - **Appareils tiers** : toute erreur avant le premier message authentifié est `Failure.AUTH` ; l'émetteur
+    éconduit l'appareil (muet plus de 10 s compris) et attend le vrai receveur ; le receveur essaie l'appareil
+    suivant qui annonce le même tag (`TravelGuest` n'en renvoie jamais deux fois le même, 3 essais). Dès qu'un pair
+    s'est authentifié, le voyage se termine : une invitation ne sert jamais à deux `OFFER` (pas de réutilisation de
+    nonce GCM, même si un `HELLO` capturé était rejoué sur une nouvelle connexion).
+  - **Rotation** : `TravelActivity` n'est plus recréée (`configChanges`) — incliner les téléphones dos à dos
+    annulait le voyage. **Autorisation refusée** : au retour sur l'écran on revérifie sans redemander (la demande
+    pouvait boucler). **NFC** : pendant l'envoi, le téléphone ne lit plus d'étiquettes
+    (`setDiscoveryTechnology(FLAG_READER_DISABLE, FLAG_LISTEN_KEEP)`) — il est l'étiquette, pas le lecteur.
+  - Doc corrigée : l'étiquette jointe à l'intent (`EXTRA_TAG`) se forge ; le vrai garde-fou est « Accueillir ? ».
+  - Tests : `TravelTest` (erreurs avant authentification, fin après `HELLO`, enregistré puis lien coupé,
+    écriture durable / impossible). À vérifier sur deux téléphones : contact NFC avec lecteur coupé, rotation
+    pendant l'échange.
