@@ -164,13 +164,13 @@ jobs:
 
       # Chemins du SARIF relatifs à la racine du dépôt (%SRCROOT%) : rien à réécrire. Une catégorie par module.
       - name: SARIF :core
-        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        uses: github/codeql-action/upload-sarif@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
         with:
           sarif_file: detekt/core/build/reports/detekt/detekt.sarif
           category: detekt-core
 
       - name: SARIF :app
-        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        uses: github/codeql-action/upload-sarif@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
         with:
           sarif_file: detekt/app/build/reports/detekt/detekt.sarif
           category: detekt-app
